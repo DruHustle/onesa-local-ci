@@ -21,7 +21,9 @@ gh workflow run trusted-portal.yml --repo DruHustle/onesa-local-ci --ref main -f
 gh run list --repo DruHustle/onesa-local-ci --workflow trusted-portal.yml --event workflow_dispatch --limit 5
 ```
 
-Match the source SHA to the reviewed revision before dispatch. Use `gh run watch RUN_ID --repo DruHustle/onesa-local-ci --exit-status` to follow the selected run. The GitHub preflight checks the owner, controller, branch and Portal SHA. The ARM64 job fetches the checked public main revision, validates the documentation, and runs the system appearance tests. A fresh GitHub-hosted job verifies both checks at the same SHA and compares the local receipt. For a cloud-only check, pass `-f run_local=false`. The dispatch summary distinguishes the two paths. Product PRs keep their GitHub-hosted jobs.
+Match the source SHA to the reviewed revision before dispatch. Use `gh run watch RUN_ID --repo DruHustle/onesa-local-ci --exit-status` to follow the selected run. GitHub evaluates the owner, private controller, main ref and manual-event conditions before assigning a job. The default local path requires only the ARM64 runner. It fetches public Portal main, matches the requested SHA, validates documentation and runs the system appearance tests. It then reads the independent public `Portal verification` main-push run at that SHA and requires a successful `verify` job on GitHub-hosted Ubuntu. The summary links the exact public run attempt. If public verification is pending, rerun after it finishes. No private GitHub-hosted runner is scheduled on the local path.
+
+An optional `-f run_local=false` dispatch runs the documentation and appearance checks entirely on a private GitHub-hosted runner, subject to the account’s included Actions capacity and spending controls. A hosted-only dispatch records its scope. Product PRs keep their GitHub-hosted jobs.
 
 ## Stop and resume
 

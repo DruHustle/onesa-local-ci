@@ -10,43 +10,18 @@ on:
       run_local:
         description: Run source checks on the registered local ARM64 host
         type: boolean
-        default: false
+        default: true
 permissions: {}
 concurrency:
   group: trusted-local-portal
   cancel-in-progress: false
 jobs:
-  preflight:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Verify controller and reviewed public source
-        env:
-          SOURCE_SHA: ${{ inputs.source_sha }}
-          OWNER: ${{ github.repository_owner }}
-          VISIBILITY: ${{ github.event.repository.visibility }}
-          REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
-          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          [[ "$GITHUB_REPOSITORY" == DruHustle/onesa-local-ci && "$GITHUB_REF" == refs/heads/main ]]
-          [[ "$REPOSITORY_PRIVATE" == true && "$OWNER" == DruHustle && "$GITHUB_ACTOR" == "$OWNER" && "$TRIGGERING_ACTOR" == "$OWNER" ]]
-          [[ -z "$VISIBILITY" || "$VISIBILITY" == private ]]
-          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
-          actual=$(git ls-remote --exit-code https://github.com/DruHustle/onesa-company-portal.git refs/heads/main | cut -f1)
-          [[ "$actual" == "$SOURCE_SHA" ]]
-          printf 'Verified Portal main `%s`.\n' "$SOURCE_SHA" >> "$GITHUB_STEP_SUMMARY"
   local:
-    needs: preflight
-    if: ${{ inputs.run_local }}
+    if: ${{ inputs.run_local && github.event_name == 'workflow_dispatch' && github.repository == 'DruHustle/onesa-local-ci' && github.event.repository.private == true && github.ref == 'refs/heads/main' && github.actor == 'DruHustle' && github.triggering_actor == 'DruHustle' }}
     runs-on: [self-hosted, Linux, ARM64, onesa-portal-local]
     timeout-minutes: 10
-    outputs:
-      tested_sha: ${{ steps.checks.outputs.tested_sha }}
     steps:
       - name: Check documentation and system appearance on trusted Portal main
-        id: checks
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
         shell: bash
@@ -66,10 +41,38 @@ jobs:
           clean_env=(env -i "HOME=$scratch/home" PATH=/usr/local/bin:/usr/bin:/bin LANG=C.UTF-8)
           "${clean_env[@]}" python3 scripts/validate-docs.py
           "${clean_env[@]}" onesa-ci-node --test scripts/test_system_appearance.mjs
-          printf 'tested_sha=%s\n' "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          printf 'Local ARM64 Portal documentation and appearance checks passed at `%s`.\n' "$SOURCE_SHA" >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify the independent public GitHub-hosted run at the tested SHA
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        shell: python3 {0}
+        run: |
+          import json, os, re
+          from urllib.request import urlopen
+          repo = 'DruHustle/onesa-company-portal'
+          sha = os.environ['SOURCE_SHA']
+          assert re.fullmatch('[a-f0-9]{40}', sha)
+          def read(path):
+              with urlopen(f'https://api.github.com/repos/{repo}/actions/{path}', timeout=20) as response:
+                  return json.load(response)
+          result = read(f'workflows/verify.yml/runs?branch=main&event=push&head_sha={sha}&per_page=10')
+          runs = [run for run in result['workflow_runs'] if run['head_sha'] == sha and run['head_branch'] == 'main'
+                  and run['event'] == 'push' and run['path'] == '.github/workflows/verify.yml'
+                  and run['head_repository']['full_name'] == repo]
+          if not runs:
+              raise SystemExit(f'No public Portal main push verification found for {sha}.')
+          run = max(runs, key=lambda item: item['id'])
+          url = f"https://github.com/{repo}/actions/runs/{run['id']}/attempts/{run['run_attempt']}"
+          if run['status'] != 'completed' or run['conclusion'] != 'success':
+              raise SystemExit(f"Public verification {run['status']} ({run['conclusion']}): {url}")
+          jobs = read(f"runs/{run['id']}/attempts/{run['run_attempt']}/jobs?per_page=100")['jobs']
+          if not any(job['name'] == 'verify' and job['status'] == 'completed' and job['conclusion'] == 'success'
+                     and 'ubuntu-24.04' in job['labels'] and 'self-hosted' not in job['labels'] for job in jobs):
+              raise SystemExit(f'The public GitHub-hosted verify job did not pass: {url}')
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              print(f'Matching [public GitHub-hosted Portal verification]({url}) passed at `{sha}`.', file=summary)
   hosted-verification:
-    needs: [preflight, local]
-    if: ${{ always() && needs.preflight.result == 'success' }}
+    if: ${{ !inputs.run_local && github.event_name == 'workflow_dispatch' && github.repository == 'DruHustle/onesa-local-ci' && github.event.repository.private == true && github.ref == 'refs/heads/main' && github.actor == 'DruHustle' && github.triggering_actor == 'DruHustle' }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -81,24 +84,16 @@ jobs:
       - name: Independently check the exact public source on GitHub
         env:
           EXPECTED_SHA: ${{ inputs.source_sha }}
-          REQUESTED_LOCAL: ${{ inputs.run_local }}
-          LOCAL_RESULT: ${{ needs.local.result }}
-          LOCAL_SHA: ${{ needs.local.outputs.tested_sha }}
         shell: bash
         run: |
           set -euo pipefail
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
           git -c core.hooksPath=/dev/null init -q "$RUNNER_TEMP/portal-hosted"
           cd "$RUNNER_TEMP/portal-hosted"
-          git -c credential.helper= fetch --quiet --no-tags --depth=1 https://github.com/DruHustle/onesa-company-portal.git "$EXPECTED_SHA"
+          git -c credential.helper= fetch --quiet --no-tags --depth=1 https://github.com/DruHustle/onesa-company-portal.git refs/heads/main
           [[ $(git rev-parse FETCH_HEAD) == "$EXPECTED_SHA" ]]
           git -c core.hooksPath=/dev/null checkout --quiet --detach "$EXPECTED_SHA"
           python3 scripts/validate-docs.py
           node --test scripts/test_system_appearance.mjs
           printf 'GitHub-hosted Portal documentation and appearance checks passed at `%s`.\n' "$EXPECTED_SHA" >> "$GITHUB_STEP_SUMMARY"
-          if [[ "$REQUESTED_LOCAL" == true ]]; then
-            printf 'The local ARM64 job finished with **%s**.\n' "$LOCAL_RESULT" >> "$GITHUB_STEP_SUMMARY"
-            [[ "$LOCAL_RESULT" == success && "$LOCAL_SHA" == "$EXPECTED_SHA" ]]
-          else
-            printf 'Hosted-only run. Local verification was not requested.\n' >> "$GITHUB_STEP_SUMMARY"
-          fi
+          printf 'Hosted-only run. Local verification was not requested.\n' >> "$GITHUB_STEP_SUMMARY"

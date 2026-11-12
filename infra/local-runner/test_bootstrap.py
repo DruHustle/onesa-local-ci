@@ -1,4 +1,8 @@
 import base64
+import io
+import json
+import os
+import textwrap
 import hashlib
 import importlib.util
 import subprocess
@@ -84,9 +88,37 @@ class RunnerTest(unittest.TestCase):
         workflow = boot.reviewed_workflow().read_text()
         self.assertNotIn('pull_request', workflow)
         self.assertIn('permissions: {}', workflow)
-        self.assertIn('needs: [preflight, local]', workflow)
+        self.assertNotIn('needs:', workflow)
+        self.assertIn('if: ${{ inputs.run_local &&', workflow)
+        self.assertIn('if: ${{ !inputs.run_local &&', workflow)
+        self.assertEqual(workflow.count("github.event.repository.private == true"), 2)
         self.assertEqual(workflow.count('scripts/validate-docs.py'), 2)
         self.assertEqual(workflow.count('scripts/test_system_appearance.mjs'), 2)
+
+    def test_public_receipt_is_bound_to_sha_workflow_and_successful_hosted_job(self):
+        section = boot.reviewed_workflow().read_text().split('shell: python3 {0}\n        run: |\n')[1]
+        check = compile(textwrap.dedent(section.split('\n  hosted-verification:')[0]), '<receipt>', 'exec')
+        sha = 'a' * 40
+        run = {'id': 30, 'run_attempt': 2, 'head_sha': sha, 'head_branch': 'main', 'event': 'push',
+               'path': '.github/workflows/verify.yml', 'head_repository': {'full_name': 'DruHustle/onesa-company-portal'},
+               'status': 'completed', 'conclusion': 'success'}
+        job = {'name': 'verify', 'labels': ['ubuntu-24.04'], 'status': 'completed', 'conclusion': 'success'}
+        with tempfile.TemporaryDirectory() as root:
+            summary = Path(root) / 'summary'
+            for updated_run, updated_job, ok in [({}, {}, True), ({'head_sha': 'b' * 40}, {}, False),
+                                                  ({'event': 'pull_request'}, {}, False), ({'status': 'in_progress'}, {}, False),
+                                                  ({}, {'conclusion': 'skipped'}, False), ({}, {'labels': ['self-hosted']}, False)]:
+                with self.subTest(updated_run=updated_run, updated_job=updated_job):
+                    replies = [io.BytesIO(json.dumps({'workflow_runs': [dict(run, **updated_run)]}).encode()),
+                               io.BytesIO(json.dumps({'jobs': [dict(job, **updated_job)]}).encode())]
+                    with patch('urllib.request.urlopen', side_effect=replies) as api, patch.dict(os.environ, {'SOURCE_SHA': sha, 'GITHUB_STEP_SUMMARY': str(summary)}):
+                        if ok:
+                            exec(check, {})
+                            self.assertIn('runs/30/attempts/2', summary.read_text())
+                            self.assertIn('head_sha=' + sha, api.call_args_list[0].args[0])
+                        else:
+                            with self.assertRaises(SystemExit):
+                                exec(check, {})
 
 
 if __name__ == '__main__':
