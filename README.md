@@ -32,6 +32,14 @@ limactl start-at-login --enabled=false onesa-portal-local-arm64
 limactl stop onesa-portal-local-arm64
 ```
 
-The offline registration remains available for the same guest. Rerun the bootstrap to resume service. Before retiring the guest permanently, verify it is idle, remove its registration in this repository's Actions runner settings, and then remove the dedicated VM and its matching `~/Library/Application Support/Onesa/local-ci/guest.sha256` marker. The bootstrap never deletes another host's registration.
+The offline registration remains available for the same guest. If the installer stopped after GitHub reported `Settings Saved`, update the existing checkout on the Mac and resume:
+
+```sh
+cd ~/onesa-local-ci
+git pull --ff-only origin main
+python3 infra/local-runner/bootstrap.py
+```
+
+The bootstrap checks the saved runner ID against GitHub and finishes installing the service with that registration. An existing active service keeps its current job. An upgraded unit starts the official service wrapper on its next normal start. Before retiring the guest permanently, verify it is idle, remove its registration in this repository's Actions runner settings, and then remove the dedicated VM and its matching `~/Library/Application Support/Onesa/local-ci/guest.sha256` marker. The bootstrap never deletes another host's registration.
 
 Run the configuration regression suite with `python3 -m unittest discover -s infra/local-runner -v`. An actual local verification requires an online ARM64 registration and a successful trusted dispatch.

@@ -52,27 +52,100 @@ class RunnerTest(unittest.TestCase):
         with patch.object(boot, 'api', side_effect=values.__getitem__):
             boot.controller()
 
-    def test_registration_is_once_and_repeat_repairs_the_same_service(self):
+    def test_existing_bom_registration_resumes_after_guest_setup_failure(self):
         registered = {'id': 42, 'name': boot.VM, 'status': 'online',
                       'labels': [{'name': x} for x in ['self-hosted', 'Linux', 'ARM64', boot.LABEL]]}
         configured = json.dumps({'agentName': boot.VM, 'agentId': 42,
-                                 'gitHubUrl': 'https://github.com/' + boot.REPO}).encode()
+                                 'gitHubUrl': 'https://github.com/' + boot.REPO}).encode('utf-8-sig')
+        offline = dict(registered, status='offline')
+        interrupted_setup = subprocess.CalledProcessError(1, 'guest setup after registration')
         with tempfile.TemporaryDirectory() as root, patch.object(Path, 'home', return_value=Path(root)), \
                 patch.object(boot.platform, 'system', return_value='Darwin'), \
                 patch.object(boot.platform, 'machine', return_value='arm64'), \
                 patch.object(boot.shutil, 'which', return_value='/bin/tool'), \
                 patch.object(boot.os, 'geteuid', return_value=501), patch.object(boot, 'controller'), \
                 patch.object(boot, 'provision_vm'), patch('builtins.print'), \
-                patch.object(boot, 'guest', side_effect=[b'', None, None, configured, None, None]) as guest, \
-                patch.object(boot, 'remote_runner', side_effect=[None, registered, registered, registered]), \
+                patch.object(boot, 'guest', side_effect=[b'', None, interrupted_setup, configured, None, None]) as guest, \
+                patch.object(boot, 'remote_runner', side_effect=[None, offline, registered]), \
                 patch.object(boot, 'api', return_value={'token': 'synthetic-registration'}) as api, \
                 patch.object(boot, 'run') as run:
-            boot.configure()
+            with self.assertRaises(subprocess.CalledProcessError):
+                boot.configure()
             boot.configure()
             api.assert_called_once_with('actions/runners/registration-token', 'POST')
             self.assertIn(call('sudo', 'bash', '/run/onesa-ci-bootstrap', data=b'synthetic-registration\n'), guest.call_args_list)
             self.assertIn(call('sudo', 'bash', '/run/onesa-ci-bootstrap', data=b''), guest.call_args_list)
-            self.assertEqual(run.call_args_list, [call('limactl', 'start-at-login', boot.VM)] * 2)
+            run.assert_called_once_with('limactl', 'start-at-login', boot.VM)
+
+    def test_guest_validates_real_runner_settings_with_and_without_utf8_bom(self):
+        guest = (HERE / 'guest.sh').read_text()
+        validation = guest.split("python3 - <<'PY'\n", 1)[1].split('\nPY\n', 1)[0]
+        settings = {'agentId': 42, 'agentName': boot.VM, 'gitHubUrl': 'https://github.com/' + boot.REPO}
+        cases = [('utf-8', {}, True), ('utf-8-sig', {}, True),
+                 ('utf-8-sig', {'agentName': 'a-different-runner'}, False),
+                 ('utf-8-sig', {'gitHubUrl': 'https://github.com/example/another'}, False)]
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / '.runner'
+            for encoding, overrides, valid in cases:
+                with self.subTest(encoding=encoding, overrides=overrides):
+                    original = json.dumps(dict(settings, **overrides)).encode(encoding)
+                    path.write_bytes(original)
+                    result = subprocess.run(['python3', '-c', validation], cwd=root, capture_output=True)
+                    self.assertEqual(result.returncode == 0, valid, result.stderr)
+                    self.assertEqual(path.read_bytes(), original)
+
+    def test_guest_resumes_missing_service_and_preserves_active_work(self):
+        # Run the installed-registration path with local account/systemd fixtures.
+        guest = (HERE / 'guest.sh').read_text().split('work=/opt/onesa-actions-runner\n', 1)[1]
+        guest = guest.replace('unit=/etc/systemd/system/onesa-local-ci.service', 'unit="$fixture/unit"')
+        guest = guest.replace('/usr/local/bin/onesa-ci-node', '"$fixture/onesa-ci-node"')
+        commands = '''set -eu
+getent() { return 0; }
+id() { echo onesa-ci; }
+apt-get() { echo 'Unexpected reinstall' >&2; exit 1; }
+runuser() { [[ $1 == -u && $2 == onesa-ci && $3 == -- ]]; shift 3; "$@"; }
+systemctl() {
+  echo "$*" >> "$fixture/calls"
+  case "$1" in
+    is-active) test -e "$fixture/active";;
+    start) touch "$fixture/active";;
+    daemon-reload|enable) return 0;;
+    *) echo "Unexpected $*" >&2; exit 1;;
+  esac
+}
+'''
+        with tempfile.TemporaryDirectory() as root:
+            fixture = Path(root)
+            work = fixture / 'runner'
+            node = work / 'externals/node24/bin/node'
+            node.parent.mkdir(parents=True)
+            node.write_text('#!/bin/sh\nexit 0\n')
+            node.chmod(0o755)
+            vendor_wrapper = work / 'bin/runsvc.sh'
+            vendor_wrapper.parent.mkdir()
+            vendor_wrapper.write_text('#!/bin/bash\nexit 0\n')
+            settings = {'agentId': 42, 'agentName': boot.VM, 'gitHubUrl': 'https://github.com/' + boot.REPO}
+            metadata = json.dumps(settings).encode('utf-8-sig')
+            (work / '.runner').write_bytes(metadata)
+            env = {**os.environ, 'fixture': root, 'work': str(work)}
+            for state in ['missing', 'active legacy', 'active current']:
+                with self.subTest(state=state):
+                    unit = fixture / 'unit'
+                    if state == 'active legacy':
+                        unit.write_text(f'ExecStart={work}/run.sh\n')
+                    (fixture / 'calls').write_text('')
+                    result = subprocess.run(['bash', '-c', commands + guest], env=env, capture_output=True,
+                                            stdin=subprocess.DEVNULL)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    calls = (fixture / 'calls').read_text().splitlines()
+                    self.assertEqual(calls.count('start onesa-local-ci.service'), int(state == 'missing'))
+                    self.assertEqual((work / '.runner').read_bytes(), metadata)
+                    self.assertEqual((work / 'runsvc.sh').read_bytes(), vendor_wrapper.read_bytes())
+                    self.assertEqual((work / 'runsvc.sh').stat().st_mode & 0o777, 0o755)
+                    for directive in ['WorkingDirectory=/opt/onesa-actions-runner',
+                                      'ExecStart=/opt/onesa-actions-runner/runsvc.sh', 'KillMode=process',
+                                      'KillSignal=SIGTERM', 'TimeoutStopSec=5min']:
+                        self.assertIn(directive, unit.read_text().splitlines())
 
     def test_first_create_then_repeat_without_recreating(self):
         with tempfile.TemporaryDirectory() as root:

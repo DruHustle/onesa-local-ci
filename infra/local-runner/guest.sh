@@ -39,13 +39,28 @@ cd "$work"
 python3 - <<'PY'
 import json
 from pathlib import Path
-r = json.loads(Path('.runner').read_text())
+r = json.loads(Path('.runner').read_bytes())
 assert r['agentName'] == 'onesa-portal-local-arm64'
 assert r['gitHubUrl'].rstrip('/') == 'https://github.com/DruHustle/onesa-local-ci'
 PY
 runuser -u "$account" -- "$work/externals/node24/bin/node" -e 'if (process.versions.node.split(".")[0] !== "24") process.exit(1)'
 ln -sfn "$work/externals/node24/bin/node" /usr/local/bin/onesa-ci-node
-cat > /etc/systemd/system/onesa-local-ci.service <<'UNIT'
+# GitHub's service wrapper launches its Node supervisor relative to the runner root.
+runuser -u "$account" -- sh -eu -c '
+  if ! cmp -s bin/runsvc.sh runsvc.sh; then
+    staged=$(mktemp ./runsvc.XXXXXX)
+    trap '\''rm -f "$staged"'\'' EXIT
+    install -m 0755 bin/runsvc.sh "$staged"
+    mv -f "$staged" runsvc.sh
+  fi
+  chmod 0755 runsvc.sh
+'
+unit=/etc/systemd/system/onesa-local-ci.service
+active_legacy=false
+if grep -Fqx "ExecStart=$work/run.sh" "$unit" 2>/dev/null && systemctl is-active --quiet "$service"; then
+  active_legacy=true
+fi
+cat > "$unit" <<'UNIT'
 [Unit]
 Description=Onesa private GitHub Actions runner
 After=network-online.target
@@ -55,7 +70,10 @@ User=onesa-ci
 Group=onesa-ci
 WorkingDirectory=/opt/onesa-actions-runner
 Environment=HOME=/var/lib/onesa-ci
-ExecStart=/opt/onesa-actions-runner/run.sh
+ExecStart=/opt/onesa-actions-runner/runsvc.sh
+KillMode=process
+KillSignal=SIGTERM
+TimeoutStopSec=5min
 Restart=always
 RestartSec=10
 NoNewPrivileges=true
@@ -66,7 +84,12 @@ UMask=0077
 [Install]
 WantedBy=multi-user.target
 UNIT
-chmod 0644 /etc/systemd/system/onesa-local-ci.service
+chmod 0644 "$unit"
 systemctl daemon-reload
-systemctl enable --now "$service"
+systemctl enable "$service"
+if ! systemctl is-active --quiet "$service"; then
+  systemctl start "$service"
+elif "$active_legacy"; then
+  echo "Active runner kept running. Its next normal service start will use runsvc.sh."
+fi
 systemctl is-active --quiet "$service"
