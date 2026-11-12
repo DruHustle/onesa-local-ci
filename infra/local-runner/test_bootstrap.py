@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, call
 
 HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location('local_ci_bootstrap', HERE / 'bootstrap.py')
@@ -44,6 +44,34 @@ class RunnerTest(unittest.TestCase):
                     boot.controller()
         with patch.object(boot, 'api', side_effect=self.metadata().__getitem__):
             boot.controller()
+
+    def test_owner_without_separate_collaborator_entry_can_configure(self):
+        values = self.metadata()
+        values['collaborators?per_page=100'] = []
+        with patch.object(boot, 'api', side_effect=values.__getitem__):
+            boot.controller()
+
+    def test_registration_is_once_and_repeat_repairs_the_same_service(self):
+        registered = {'id': 42, 'name': boot.VM, 'status': 'online',
+                      'labels': [{'name': x} for x in ['self-hosted', 'Linux', 'ARM64', boot.LABEL]]}
+        configured = json.dumps({'agentName': boot.VM, 'agentId': 42,
+                                 'gitHubUrl': 'https://github.com/' + boot.REPO}).encode()
+        with tempfile.TemporaryDirectory() as root, patch.object(Path, 'home', return_value=Path(root)), \
+                patch.object(boot.platform, 'system', return_value='Darwin'), \
+                patch.object(boot.platform, 'machine', return_value='arm64'), \
+                patch.object(boot.shutil, 'which', return_value='/bin/tool'), \
+                patch.object(boot.os, 'geteuid', return_value=501), patch.object(boot, 'controller'), \
+                patch.object(boot, 'provision_vm'), patch('builtins.print'), \
+                patch.object(boot, 'guest', side_effect=[b'', None, None, configured, None, None]) as guest, \
+                patch.object(boot, 'remote_runner', side_effect=[None, registered, registered, registered]), \
+                patch.object(boot, 'api', return_value={'token': 'synthetic-registration'}) as api, \
+                patch.object(boot, 'run') as run:
+            boot.configure()
+            boot.configure()
+            api.assert_called_once_with('actions/runners/registration-token', 'POST')
+            self.assertIn(call('sudo', 'bash', '/run/onesa-ci-bootstrap', data=b'synthetic-registration\n'), guest.call_args_list)
+            self.assertIn(call('sudo', 'bash', '/run/onesa-ci-bootstrap', data=b''), guest.call_args_list)
+            self.assertEqual(run.call_args_list, [call('limactl', 'start-at-login', boot.VM)] * 2)
 
     def test_first_create_then_repeat_without_recreating(self):
         with tempfile.TemporaryDirectory() as root:

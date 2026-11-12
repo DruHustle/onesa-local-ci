@@ -44,7 +44,7 @@ def controller():
             and metadata.get('default_branch') == 'main' and metadata.get('permissions', {}).get('admin'),
             'The owner-administered private controller with default main is required.')
     collaborators = api('collaborators?per_page=100')
-    require({item['login'] for item in collaborators} == {REPO.split('/')[0]},
+    require({item['login'] for item in collaborators} <= {REPO.split('/')[0]},
             'Dedicated controller requires owner-only access.')
     entries = api('contents/.github/workflows?ref=main')
     require([entry['name'] for entry in entries] == [WORKFLOW], 'Unexpected private controller workflows.')
