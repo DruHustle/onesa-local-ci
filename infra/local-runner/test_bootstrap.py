@@ -2,6 +2,7 @@ import base64
 import io
 import json
 import os
+import socket
 import textwrap
 import hashlib
 import importlib.util
@@ -107,6 +108,30 @@ class RunnerTest(unittest.TestCase):
         with patch.object(boot, 'api', return_value={'total_count': 2, 'runners': [{'name': boot.VM}, {'name': boot.VM}]}):
             with self.assertRaises(ValueError):
                 boot.remote_runner()
+
+    def test_guest_script_staging_preserves_ssh_socket_and_pipe_bytes(self):
+        source = (boot.HERE / 'guest.sh').read_bytes()
+        for transport in ['pipe', 'socket']:
+            with self.subTest(transport=transport), tempfile.TemporaryDirectory() as root:
+                target = Path(root) / 'setup'
+
+                def simulate_guest(*args, data):
+                    self.assertEqual(args[0], 'sudo')
+                    self.assertEqual(args[-1], '/run/onesa-ci-bootstrap')
+                    command = [*args[1:-1], str(target)]
+                    if transport == 'pipe':
+                        subprocess.run(command, input=data, check=True)
+                    else:
+                        sender, receiver = socket.socketpair()
+                        with sender, receiver:
+                            sender.sendall(data)
+                            sender.shutdown(socket.SHUT_WR)
+                            subprocess.run(command, stdin=receiver, check=True)
+
+                with patch.object(boot, 'guest', side_effect=simulate_guest):
+                    boot.stage_guest_setup()
+                self.assertEqual(target.read_bytes(), source)
+                self.assertEqual(target.stat().st_mode & 0o777, 0o700)
 
     def test_service_setup_shell_and_workflow_contract(self):
         subprocess.run(['bash', '-n', str(HERE / 'guest.sh')], check=True)

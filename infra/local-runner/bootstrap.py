@@ -82,6 +82,12 @@ def guest(*args, **kwargs):
     return run('limactl', 'shell', '--tty=false', '--workdir=/', VM, *args, **kwargs)
 
 
+def stage_guest_setup():
+    # A non-PTY SSH session may deliver stdin through a socket. Read the open descriptor directly.
+    guest('sudo', 'sh', '-c', 'umask 077; cat > "$1" && chmod 0700 "$1"', 'sh', '/run/onesa-ci-bootstrap',
+          data=(HERE / 'guest.sh').read_bytes())
+
+
 def remote_runner():
     listing = api('actions/runners?per_page=100')
     require(listing['total_count'] == len(listing['runners']), 'Incomplete registration inventory.')
@@ -110,7 +116,7 @@ def configure():
                     'Local and GitHub registration disagree. Inspect the existing runner before proceeding.')
         else:
             require(not remote, 'The name is already registered to another or missing guest.')
-        guest('sudo', 'install', '-m', '0700', '/dev/stdin', '/run/onesa-ci-bootstrap', data=(HERE / 'guest.sh').read_bytes())
+        stage_guest_setup()
         token = b'' if local else api('actions/runners/registration-token', 'POST')['token'].encode() + b'\n'
         guest('sudo', 'bash', '/run/onesa-ci-bootstrap', data=token)
         run('limactl', 'start-at-login', VM)
