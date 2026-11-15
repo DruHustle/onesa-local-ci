@@ -26,6 +26,18 @@ class RunnerTest(unittest.TestCase):
                 f'contents/.github/workflows/{boot.WORKFLOW}?ref=main': {
                     'content': base64.b64encode(boot.reviewed_workflow().read_bytes()).decode()}}
 
+    def test_generated_python_bytecode_is_ignored(self):
+        root = boot.HERE.parents[1]
+        for path in (
+            "infra/local-runner/__pycache__/bootstrap.cpython-311.pyc",
+            "release/__pycache__/check_portfolio.cpython-311.pyc",
+        ):
+            result = subprocess.run(
+                ["git", "-C", str(root), "check-ignore", "--no-index", path],
+                capture_output=True, text=True, check=False
+            )
+            self.assertEqual(result.returncode, 0, path)
+
     def test_bootstrap_requires_clean_canonical_exact_main_checkout(self):
         root = boot.HERE.parents[1].resolve()
         good_sha = "a" * 40
