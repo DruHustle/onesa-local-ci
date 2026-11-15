@@ -5,12 +5,18 @@ on:
       - "release/**"
       - "infra/local-runner/**"
       - ".github/workflows/**"
+      - "README.md"
+      - "AGENTS.md"
+      - ".gitignore"
   push:
     branches: [main]
     paths:
       - "release/**"
       - "infra/local-runner/**"
       - ".github/workflows/**"
+      - "README.md"
+      - "AGENTS.md"
+      - ".gitignore"
   workflow_dispatch:
 permissions:
   contents: read
