@@ -25,6 +25,19 @@ Match the source SHA to the reviewed revision before dispatch. Use `gh run watch
 
 An optional `-f run_local=false` dispatch runs the documentation and appearance checks entirely on a private GitHub-hosted runner, subject to the account’s included Actions capacity and spending controls. A hosted-only dispatch records its scope. Product PRs keep their GitHub-hosted jobs.
 
+## Local runner trust boundary
+
+The local workflow executes the selected public Portal source as the same unprivileged
+`onesa-ci` account that owns the runner installation. Treat that source as trusted code:
+a job can read or alter runner-account files, including the runner's own registration
+state. The Lima guest isolates the Mac (no host filesystem mounts or forwarded SSH
+agent); it is **not** a sandbox between a job and the runner account. Dispatch only an
+owner-reviewed commit that is the exact current public Portal `main` SHA. Never run
+pull-request heads, unreviewed branches or arbitrary repositories on this runner.
+After suspected execution of untrusted code, take the runner offline and replace its
+registration and guest before trusting it again. Do not place production credentials
+or unrelated deployment secrets in this guest.
+
 ## Stop and resume
 
 ```sh
