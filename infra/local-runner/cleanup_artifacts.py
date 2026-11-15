@@ -12,8 +12,10 @@ UTC = dt.timezone.utc
 def eligible(artifact, now, days):
     if not artifact.get("id") or artifact.get("expired"):
         return False
-    name = artifact.get("name", "")
-    if not any(name.startswith(prefix) for prefix in DISPOSABLE_PREFIXES):
+    name = artifact.get("name")
+    if not isinstance(name, str) or not any(
+        name.startswith(prefix) for prefix in DISPOSABLE_PREFIXES
+    ):
         return False
     # Untrusted/incomplete API metadata must fail closed. Never delete an
     # artifact when its creation time cannot be verified as UTC-aware.
