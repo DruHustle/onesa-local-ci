@@ -154,6 +154,15 @@ def validate(document, require_go=False):
                       "operating_limits"):
             if not isinstance(row.get(field), str):
                 errors.append(f"{key}: {field} must be text")
+        if not isinstance(row.get("candidate"), str):
+            errors.append(f"{key}: candidate must be text")
+        release_url = row.get("release_url")
+        if release_url is not None and not nonblank(release_url):
+            errors.append(f"{key}: release_url must be nonblank text or null")
+        elif row["platform"] == "web" and release_url is not None and not valid_evidence(release_url):
+            errors.append(f"{key}: web release_url must be a credential-free HTTPS URL")
+        if row.get("store_receipt") is not None and not isinstance(row.get("store_receipt"), str):
+            errors.append(f"{key}: store_receipt must be text or null")
         for field in ("owner", "workflow", "environment", "observed_result",
                       "support_owner", "operating_limits"):
             if not nonblank(row.get(field)):

@@ -119,6 +119,18 @@ class PortfolioGateTests(unittest.TestCase):
                 self.assertFalse(valid_evidence(url))
         self.assertTrue(valid_evidence("https://github.com:443/DruHustle/onesa-local-ci"))
 
+    def test_no_go_candidate_and_release_urls_are_typed_and_safe(self):
+        doc = copy.deepcopy(self.document)
+        doc["entries"][0]["candidate"] = ["not", "a", "commit"]
+        doc["entries"][1]["release_url"] = "https://user:password@example.com/private"
+        doc["entries"][2]["release_url"] = ["https://example.com"]
+        doc["entries"][3]["store_receipt"] = {"receipt": "untrusted"}
+        errors = validate(doc)
+        self.assertTrue(any("candidate must be text" in error for error in errors))
+        self.assertTrue(any("web release_url must be a credential-free HTTPS URL" in error for error in errors))
+        self.assertTrue(any("release_url must be nonblank text or null" in error for error in errors))
+        self.assertTrue(any("store_receipt must be text or null" in error for error in errors))
+
     def test_no_go_evidence_urls_are_validated_for_clients_and_scopes(self):
         doc = copy.deepcopy(self.document)
         doc["entries"][0]["evidence"] = ["https://user:password@example.com/private"]
