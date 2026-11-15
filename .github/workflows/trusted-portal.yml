@@ -8,9 +8,9 @@ on:
         required: true
         type: string
       run_local:
-        description: Run source checks on the registered local ARM64 host
+        description: Use the private controller's trusted Mac runner (unavailable while this repo is public)
         type: boolean
-        default: true
+        default: false
 permissions: {}
 concurrency:
   group: trusted-local-portal
@@ -72,8 +72,8 @@ jobs:
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
               print(f'Matching [public GitHub-hosted Portal verification]({url}) passed at `{sha}`.', file=summary)
   hosted-verification:
-    if: ${{ !inputs.run_local && github.event_name == 'workflow_dispatch' && github.repository == 'DruHustle/onesa-local-ci' && github.event.repository.private == true && github.ref == 'refs/heads/main' && github.actor == 'DruHustle' && github.triggering_actor == 'DruHustle' }}
-    runs-on: ubuntu-latest
+    if: ${{ !inputs.run_local && github.event_name == 'workflow_dispatch' && github.repository == 'DruHustle/onesa-local-ci' && github.event.repository.private == false && github.ref == 'refs/heads/main' && github.actor == 'DruHustle' && github.triggering_actor == 'DruHustle' }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 8
     steps:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
@@ -87,6 +87,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          [[ "$RUNNER_ENVIRONMENT" == github-hosted ]]
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
           git -c core.hooksPath=/dev/null init -q "$RUNNER_TEMP/portal-hosted"
           cd "$RUNNER_TEMP/portal-hosted"
