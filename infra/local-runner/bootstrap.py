@@ -17,6 +17,7 @@ REPO = 'DruHustle/onesa-local-ci'
 VM = 'onesa-portal-local-arm64'
 LABEL = 'onesa-portal-local'
 WORKFLOW = 'trusted-portal.yml'
+REVIEWED_WORKFLOWS = (WORKFLOW, 'portfolio-gates.yml')
 
 
 def run(*args, data=None, capture=False):
@@ -34,8 +35,8 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def reviewed_workflow():
-    return HERE.parents[1] / '.github/workflows' / WORKFLOW
+def reviewed_workflow(name=WORKFLOW):
+    return HERE.parents[1] / '.github/workflows' / name
 
 
 def controller():
@@ -47,10 +48,12 @@ def controller():
     require({item['login'] for item in collaborators} <= {REPO.split('/')[0]},
             'Dedicated controller requires owner-only access.')
     entries = api('contents/.github/workflows?ref=main')
-    require([entry['name'] for entry in entries] == [WORKFLOW], 'Unexpected private controller workflows.')
-    content = api(f'contents/.github/workflows/{WORKFLOW}?ref=main')
-    require(base64.b64decode(content['content']) == reviewed_workflow().read_bytes(),
-            'The active controller workflow differs from this reviewed bootstrap.')
+    require(sorted(entry['name'] for entry in entries) == sorted(REVIEWED_WORKFLOWS),
+            'Unexpected private controller workflows.')
+    for name in REVIEWED_WORKFLOWS:
+        content = api(f'contents/.github/workflows/{name}?ref=main')
+        require(base64.b64decode(content['content']) == reviewed_workflow(name).read_bytes(),
+                f'The active {name} workflow differs from this reviewed bootstrap.')
 
 
 def instances():

@@ -22,9 +22,10 @@ class RunnerTest(unittest.TestCase):
     def metadata(self):
         return {'': {'full_name': boot.REPO, 'private': True, 'default_branch': 'main', 'permissions': {'admin': True}},
                 'collaborators?per_page=100': [{'login': 'DruHustle'}],
-                'contents/.github/workflows?ref=main': [{'name': boot.WORKFLOW}],
-                f'contents/.github/workflows/{boot.WORKFLOW}?ref=main': {
-                    'content': base64.b64encode(boot.reviewed_workflow().read_bytes()).decode()}}
+                'contents/.github/workflows?ref=main': [{'name': name} for name in reversed(boot.REVIEWED_WORKFLOWS)],
+                **{f'contents/.github/workflows/{name}?ref=main': {
+                    'content': base64.b64encode(boot.reviewed_workflow(name).read_bytes()).decode()}
+                    for name in boot.REVIEWED_WORKFLOWS}}
 
     def test_only_expected_private_controller_can_register(self):
         for field, value in [('private', False), ('full_name', 'DruHustle/onesa-company-portal'), ('default_branch', 'dev')]:
@@ -37,6 +38,7 @@ class RunnerTest(unittest.TestCase):
     def test_dirty_controller_aborts_and_exact_workflow_passes(self):
         for name, value in [('collaborators?per_page=100', [{'login': 'DruHustle'}, {'login': 'another'}]),
                             ('contents/.github/workflows?ref=main', [{'name': 'another.yml'}]),
+                            ('contents/.github/workflows/portfolio-gates.yml?ref=main', {'content': 'YQ=='}),
                             (f'contents/.github/workflows/{boot.WORKFLOW}?ref=main', {'content': 'YQ=='})]:
             with self.subTest(name=name):
                 values = self.metadata()

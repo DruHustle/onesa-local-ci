@@ -52,6 +52,24 @@ class PortfolioGateTests(unittest.TestCase):
                    operating_limits="Tested hardware", blocker="")
         self.assertTrue(any("store acceptance receipt" in x for x in validate(self.document)))
 
+    def test_blank_or_unobserved_evidence_cannot_pass(self):
+        for group in ("entries", "scope_gates"):
+            for field, value in (("environment", " "), ("operating_limits", ""), ("observed_result", "Not tested at site/provider/hardware"), ("evidence", ["https://"])):
+                with self.subTest(group=group, field=field):
+                    doc = copy.deepcopy(self.document)
+                    row = doc[group][0]
+                    row.update(decision="GO", candidate="build-1", environment="pilot", role_tested="operator",
+                               observed_result="Completed", support_owner="operator", operating_limits="One pilot",
+                               evidence=["https://example.org/receipt"], blocker="")
+                    row[field] = value
+                    self.assertTrue(validate(doc))
+
+    def test_malformed_keys_report_validation_errors(self):
+        self.document["entries"][0]["product"] = []
+        self.document["scope_gates"][0]["scope"] = {}
+        self.assertTrue(validate(self.document))
+        self.assertTrue(validate([]))
+
     def test_verified_candidate_has_no_blocker(self):
         row = self.document["entries"][0]
         row.update(decision="GO", candidate="sha256:verified",
