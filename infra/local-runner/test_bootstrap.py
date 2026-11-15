@@ -302,15 +302,15 @@ systemctl() {
 
     def test_guest_rejects_root_or_misconfigured_runner_accounts(self):
         setup = (HERE / 'guest.sh').read_text()
-        body = setup.split('validate_runner_account() {', 1)[1].split('\\n}', 1)[0]
-        function = 'validate_runner_account() {' + body + '\\n}'
+        body = setup.split('validate_runner_account() {', 1)[1].split(chr(10) + '}', 1)[0]
+        function = 'validate_runner_account() {' + body + chr(10) + '}'
         harness = function + '''
-getent() { [[ $1 == passwd && $2 == onesa-ci ]] || return 1; printf '%s\\n' "$ACCOUNT_RECORD"; }
+getent() { [[ $1 == passwd && $2 == onesa-ci ]] || return 1; printf '%s' "$ACCOUNT_RECORD"; }
 id() {
   case "$1" in
-    -u) printf '%s\\n' "$ACCOUNT_UID";;
-    -gn) printf '%s\\n' "$ACCOUNT_GROUP";;
-    -nG) printf '%s\\n' "$ACCOUNT_GROUPS";;
+    -u) printf '%s' "$ACCOUNT_UID";;
+    -gn) printf '%s' "$ACCOUNT_GROUP";;
+    -nG) printf '%s' "$ACCOUNT_GROUPS";;
     *) return 1;;
   esac
 }
