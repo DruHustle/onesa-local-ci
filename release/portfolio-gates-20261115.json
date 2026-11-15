@@ -68,11 +68,13 @@
       "candidate": "5e27ba0a",
       "release_url": "https://pasofi.mobile.onesa.eu",
       "workflow": "Protected customer/operator workflow and Onesa callback",
-      "evidence": [],
-      "blocker": "Production workflow acceptance unverified",
+      "evidence": [
+        "https://pasofi-c6fe53ikv-druhustles-projects.vercel.app"
+      ],
+      "blocker": "Merchant purchase, receipt, RADIUS, router internet access and quota expiry unverified",
       "environment": "production (unverified)",
       "role_tested": "",
-      "observed_result": "Not tested on the release candidate",
+      "observed_result": "Production web remains at 5e27ba0a; source-bound PR 126 Vercel preview READY at 62535a02, but paid customer journey unverified",
       "support_owner": "commercial-wifi",
       "operating_limits": "Not qualified"
     },
