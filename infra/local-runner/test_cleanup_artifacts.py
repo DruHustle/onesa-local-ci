@@ -18,7 +18,8 @@ class ArtifactCleanupTests(unittest.TestCase):
         return {"id": 123, "name": name, "created_at": created,
                 "expired": expired, "size_in_bytes": 500,
                 "workflow_run": {"id": 456, "repository_id": self.repo_id,
-                                 "head_repository_id": self.repo_id}}
+                                 "head_repository_id": self.repo_id,
+                                 "head_sha": "a" * 40, "head_branch": "main"}}
 
     def test_old_disposable_artifact_is_eligible(self):
         self.assertTrue(cleanup.eligible(
@@ -127,6 +128,20 @@ class ArtifactCleanupTests(unittest.TestCase):
                 with self.assertRaises(SystemExit):
                     cleanup.main()
             self.assertFalse(any(x[:3] == ("api", "-X", "DELETE") for x in calls))
+
+    def test_artifact_provenance_requires_exact_source_revision(self):
+        valid = self.item("ci-old", "2026-09-01T00:00:00Z")
+        self.assertTrue(cleanup.eligible(valid, self.now, 14, self.repo_id))
+        for bad_sha in (None, "", "a" * 39, "a" * 41, "not-a-sha", True):
+            provenance = dict(valid["workflow_run"], head_sha=bad_sha)
+            artifact = dict(valid, workflow_run=provenance)
+            with self.subTest(head_sha=bad_sha):
+                self.assertFalse(cleanup.eligible(artifact, self.now, 14, self.repo_id))
+        for bad_branch in (None, "", "   ", 7):
+            provenance = dict(valid["workflow_run"], head_branch=bad_branch)
+            artifact = dict(valid, workflow_run=provenance)
+            with self.subTest(head_branch=bad_branch):
+                self.assertFalse(cleanup.eligible(artifact, self.now, 14, self.repo_id))
 
     def test_unprintable_artifact_names_are_not_eligible(self):
         for name in ("ci-old\nDELETE 9", "preview-\x1b[31m", "test-\u2028other"):
