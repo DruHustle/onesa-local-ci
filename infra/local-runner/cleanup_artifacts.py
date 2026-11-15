@@ -15,7 +15,17 @@ def eligible(artifact, now, days):
     name = artifact.get("name", "")
     if not any(name.startswith(prefix) for prefix in DISPOSABLE_PREFIXES):
         return False
-    created = dt.datetime.fromisoformat(artifact["created_at"].replace("Z", "+00:00"))
+    # Untrusted/incomplete API metadata must fail closed. Never delete an
+    # artifact when its creation time cannot be verified as UTC-aware.
+    raw_created = artifact.get("created_at")
+    if not isinstance(raw_created, str):
+        return False
+    try:
+        created = dt.datetime.fromisoformat(raw_created.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if created.tzinfo is None:
+        return False
     return now - created >= dt.timedelta(days=days)
 
 
