@@ -217,7 +217,11 @@ systemctl() {
         self.assertNotIn('needs:', workflow)
         self.assertIn('if: ${{ inputs.run_local &&', workflow)
         self.assertIn('if: ${{ !inputs.run_local &&', workflow)
-        self.assertEqual(workflow.count("github.event.repository.private == true"), 2)
+        self.assertEqual(workflow.count("github.event.repository.private == true"), 1)
+        self.assertEqual(workflow.count("github.event.repository.private == false"), 1)
+        self.assertIn("default: false", workflow)
+        self.assertIn("runs-on: ubuntu-24.04", workflow)
+        self.assertIn("name: Public controller checks", workflow)
         self.assertEqual(workflow.count('scripts/validate-docs.py'), 2)
         self.assertEqual(workflow.count('scripts/test_system_appearance.mjs'), 2)
 
