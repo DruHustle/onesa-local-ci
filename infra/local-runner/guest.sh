@@ -14,10 +14,34 @@ fi
 work=/opt/onesa-actions-runner
 account=onesa-ci
 service=onesa-local-ci.service
+validate_runner_account() {
+  local account="$1" record passwd_name passwd_password passwd_uid passwd_gid passwd_gecos passwd_home passwd_shell
+  record=$(getent passwd "$account") || {
+    echo 'Runner account is missing' >&2
+    return 1
+  }
+  IFS=: read -r passwd_name passwd_password passwd_uid passwd_gid passwd_gecos passwd_home passwd_shell <<< "$record"
+  [[ "$passwd_name" == "$account" && "$passwd_uid" =~ ^[0-9]+$ && "$passwd_gid" =~ ^[0-9]+$ ]] || {
+    echo 'Runner account identity is malformed' >&2
+    return 1
+  }
+  (( passwd_uid > 0 && passwd_gid > 0 )) || {
+    echo 'Runner account and primary group must not be root' >&2
+    return 1
+  }
+  [[ "$passwd_home" == /var/lib/onesa-ci && "$passwd_shell" == /usr/sbin/nologin ]] || {
+    echo 'Runner account home or shell is not the expected locked-down configuration' >&2
+    return 1
+  }
+  [[ $(id -u "$account") == "$passwd_uid" && $(id -gn "$account") == "$account" && $(id -nG "$account") == "$account" ]] || {
+    echo 'Runner account must have only its dedicated unprivileged primary group' >&2
+    return 1
+  }
+}
 if ! getent passwd "$account" >/dev/null; then
   useradd --system --user-group --create-home --home-dir /var/lib/onesa-ci --shell /usr/sbin/nologin "$account"
 fi
-[[ $(id -nG "$account") == "$account" ]]
+validate_runner_account "$account"
 if [[ ! -f "$work/.runner" ]]; then
   export DEBIAN_FRONTEND=noninteractive
   apt-get -q update >/dev/null

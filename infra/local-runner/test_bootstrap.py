@@ -134,8 +134,20 @@ class RunnerTest(unittest.TestCase):
         guest = guest.replace('unit=/etc/systemd/system/onesa-local-ci.service', 'unit="$fixture/unit"')
         guest = guest.replace('/usr/local/bin/onesa-ci-node', '"$fixture/onesa-ci-node"')
         commands = '''set -eu
-getent() { return 0; }
-id() { echo onesa-ci; }
+getent() {
+  if [[ $1 == passwd && $2 == onesa-ci ]]; then
+    echo 'onesa-ci:x:999:999::/var/lib/onesa-ci:/usr/sbin/nologin'
+    return 0
+  fi
+  return 1
+}
+id() {
+  case "$1" in
+    -u) echo 999;;
+    -gn|-nG) echo onesa-ci;;
+    *) return 1;;
+  esac
+}
 apt-get() { echo 'Unexpected reinstall' >&2; exit 1; }
 runuser() { [[ $1 == -u && $2 == onesa-ci && $3 == -- ]]; shift 3; "$@"; }
 systemctl() {
@@ -288,16 +300,48 @@ systemctl() {
                                 exec(check, {})
 
 
+    def test_guest_rejects_root_or_misconfigured_runner_accounts(self):
+        setup = (HERE / 'guest.sh').read_text()
+        body = setup.split('validate_runner_account() {', 1)[1].split('\\n}', 1)[0]
+        function = 'validate_runner_account() {' + body + '\\n}'
+        harness = function + '''
+getent() { [[ $1 == passwd && $2 == onesa-ci ]] || return 1; printf '%s\\n' "$ACCOUNT_RECORD"; }
+id() {
+  case "$1" in
+    -u) printf '%s\\n' "$ACCOUNT_UID";;
+    -gn) printf '%s\\n' "$ACCOUNT_GROUP";;
+    -nG) printf '%s\\n' "$ACCOUNT_GROUPS";;
+    *) return 1;;
+  esac
+}
+validate_runner_account onesa-ci
+'''
+        good = 'onesa-ci:x:999:999::/var/lib/onesa-ci:/usr/sbin/nologin'
+        cases = [
+            (good, '999', 'onesa-ci', 'onesa-ci', True),
+            ('onesa-ci:x:0:999::/var/lib/onesa-ci:/usr/sbin/nologin', '0', 'onesa-ci', 'onesa-ci', False),
+            ('onesa-ci:x:999:0::/var/lib/onesa-ci:/usr/sbin/nologin', '999', 'root', 'onesa-ci root', False),
+            (good, '999', 'onesa-ci', 'onesa-ci sudo', False),
+            ('onesa-ci:x:999:999::/home/onesa-ci:/usr/sbin/nologin', '999', 'onesa-ci', 'onesa-ci', False),
+            ('onesa-ci:x:999:999::/var/lib/onesa-ci:/bin/bash', '999', 'onesa-ci', 'onesa-ci', False),
+        ]
+        for record, uid, group, groups, expected in cases:
+            with self.subTest(record=record, groups=groups):
+                env = {**os.environ, 'ACCOUNT_RECORD': record, 'ACCOUNT_UID': uid,
+                       'ACCOUNT_GROUP': group, 'ACCOUNT_GROUPS': groups}
+                result = subprocess.run(['bash', '-c', harness], env=env, capture_output=True)
+                self.assertEqual(result.returncode == 0, expected, result.stderr)
+
     def test_all_external_workflow_actions_are_pinned_to_full_commit_shas(self):
         for name in ('portfolio-gates.yml', boot.WORKFLOW):
             with self.subTest(workflow=name):
                 for line in boot.reviewed_workflow(name).read_text().splitlines():
                     stripped = line.strip()
                     if stripped.startswith('uses:'):
-                        self.assertRegex(stripped.split('@', 1)[1], r'^[0-9a-f]{40}
-    unittest.main()
-,
-                                         f'{name} must pin third-party actions to immutable commit SHAs')
+                        ref = stripped.split('@', 1)[1]
+                        self.assertEqual(len(ref), 40)
+                        self.assertTrue(all(char in '0123456789abcdef' for char in ref),
+                                        f'{name} must pin third-party actions to immutable commit SHAs')
 
 
 if __name__ == '__main__':
