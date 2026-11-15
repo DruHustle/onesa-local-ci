@@ -107,7 +107,7 @@ class ArtifactCleanupTests(unittest.TestCase):
         def fake_gh(*args):
             calls.append(args)
             if args == ("api", "repos/DruHustle/onesa-local-ci"):
-                return json.dumps({"full_name": "DruHustle/onesa-local-ci", "id": self.repo_id})
+                return json.dumps({"full_name": "DruHustle/onesa-local-ci", "id": self.repo_id, "default_branch": "main"})
             if args[:2] == ("api", "--paginate"):
                 return "\n".join(json.dumps(item) for item in (old, other))
             if args[:3] == ("api", "-X", "DELETE"):
@@ -168,7 +168,7 @@ class ArtifactCleanupTests(unittest.TestCase):
         def fake_gh(*args):
             calls.append(args)
             if args == ("api", "repos/DruHustle/onesa-local-ci"):
-                return json.dumps({"full_name": "DruHustle/onesa-local-ci", "id": self.repo_id})
+                return json.dumps({"full_name": "DruHustle/onesa-local-ci", "id": self.repo_id, "default_branch": "main"})
             if args[:2] == ("api", "--paginate"):
                 return "\n".join(json.dumps(item) for item in (old, old))
             raise AssertionError(args)
@@ -190,7 +190,7 @@ class ArtifactCleanupTests(unittest.TestCase):
         def fake_gh(*args):
             calls.append(args)
             if args == ("api", "repos/DruHustle/onesa-local-ci"):
-                return json.dumps({"full_name": "DruHustle/onesa-local-ci", "id": self.repo_id})
+                return json.dumps({"full_name": "DruHustle/onesa-local-ci", "id": self.repo_id, "default_branch": "main"})
             if args[:2] == ("api", "--paginate"):
                 return "\n".join(json.dumps(item) for item in (valid, malformed_duplicate))
             raise AssertionError(args)
@@ -220,7 +220,7 @@ class ArtifactCleanupTests(unittest.TestCase):
                 def fake_gh(*args):
                     calls.append(args)
                     if args == ("api", "repos/DruHustle/onesa-local-ci"):
-                        return json.dumps({"full_name": "DruHustle/onesa-local-ci", "id": self.repo_id})
+                        return json.dumps({"full_name": "DruHustle/onesa-local-ci", "id": self.repo_id, "default_branch": "main"})
                     if args[:2] == ("api", "--paginate"):
                         return "\n".join(json.dumps(item) for item in (valid, malformed))
                     raise AssertionError(args)
@@ -231,6 +231,27 @@ class ArtifactCleanupTests(unittest.TestCase):
                         with self.assertRaises(SystemExit):
                             cleanup.main()
                 self.assertFalse(any(call[:3] == ("api", "-X", "DELETE") for call in calls))
+
+    def test_repository_default_branch_is_never_eligible(self):
+        artifact = self.item("ci-old", "2026-09-01T00:00:00Z")
+        self.assertFalse(cleanup.eligible(artifact, self.now, 14, self.repo_id, "develop"))
+        self.assertTrue(cleanup.eligible(artifact, self.now, 14, self.repo_id, "trunk"))
+
+    def test_missing_repository_default_branch_fails_before_listing_or_deletion(self):
+        from unittest.mock import patch
+        import json
+        calls = []
+        def fake_gh(*args):
+            calls.append(args)
+            if args == ("api", "repos/DruHustle/onesa-local-ci"):
+                return json.dumps({"full_name": "DruHustle/onesa-local-ci", "id": self.repo_id})
+            raise AssertionError(args)
+        with patch.object(cleanup, "gh", side_effect=fake_gh):
+            with patch("sys.argv", ["cleanup", "--apply", "--confirm-repo",
+                                    "DruHustle/onesa-local-ci", "--confirm-id", "123"]):
+                with self.assertRaises(SystemExit):
+                    cleanup.main()
+        self.assertEqual(calls, [("api", "repos/DruHustle/onesa-local-ci")])
 
     def test_expired_artifacts_not_redeleted(self):
         self.assertFalse(cleanup.eligible(
