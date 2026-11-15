@@ -177,6 +177,36 @@ class ArtifactCleanupTests(unittest.TestCase):
                     cleanup.main()
         self.assertFalse(any(call[:3] == ("api", "-X", "DELETE") for call in calls))
 
+    def test_malformed_inventory_records_abort_before_any_delete(self):
+        import json
+        from unittest.mock import patch
+        valid = self.item("ci-old", "2026-09-01T00:00:00Z")
+        malformed_records = (
+            dict(valid, id="123"),
+            dict(valid, id=123.0),
+            dict(valid, id=True),
+            None,
+            ["not", "an", "artifact"],
+        )
+        for malformed in malformed_records:
+            with self.subTest(record=malformed):
+                calls = []
+
+                def fake_gh(*args):
+                    calls.append(args)
+                    if args == ("api", "repos/DruHustle/onesa-local-ci"):
+                        return json.dumps({"full_name": "DruHustle/onesa-local-ci", "id": self.repo_id})
+                    if args[:2] == ("api", "--paginate"):
+                        return "\\n".join(json.dumps(item) for item in (valid, malformed))
+                    raise AssertionError(args)
+
+                with patch.object(cleanup, "gh", side_effect=fake_gh):
+                    with patch("sys.argv", ["cleanup", "--apply", "--confirm-repo",
+                                            "DruHustle/onesa-local-ci", "--confirm-id", "123"]):
+                        with self.assertRaises(SystemExit):
+                            cleanup.main()
+                self.assertFalse(any(call[:3] == ("api", "-X", "DELETE") for call in calls))
+
     def test_expired_artifacts_not_redeleted(self):
         self.assertFalse(cleanup.eligible(
             self.item("ci-old", "2026-09-01T00:00:00Z", True),
