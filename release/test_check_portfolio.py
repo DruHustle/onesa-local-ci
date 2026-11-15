@@ -11,6 +11,20 @@ class PortfolioGateTests(unittest.TestCase):
     def setUp(self):
         self.document = json.loads(MATRIX.read_text())
 
+    def evidence_for(self, product, sha):
+        repositories = {
+            "onesa-mobile": "onesa-mobile", "pasofi": "pasofi",
+            "onesa-drone": "onesa-drone", "onesa-robot": "onesa-robot",
+            "smart-farmer": "smart-farmer", "smart-logistics": "smart-logistics",
+            "smart-factory": "smart-factory", "onesa-ai-platform": "onesa-ai-platform",
+            "company-portal": "onesa-company-portal",
+            "documents-public": "onesa-documents", "documents-internal": "onesa-documents",
+            "identity": "onesa-identity",
+        }
+        repository = repositories[product]
+        base = f"https://github.com/DruHustle/{repository}"
+        return [f"{base}/commit/{sha}", f"{base}/actions/runs/123"]
+
     def test_all_28_client_rows_are_present(self):
         self.assertEqual(len(self.document["entries"]), 28)
         self.assertEqual(validate(self.document), [])
@@ -46,8 +60,9 @@ class PortfolioGateTests(unittest.TestCase):
 
     def test_native_go_requires_store_receipt(self):
         row = next(x for x in self.document["entries"] if x["platform"] == "ios")
-        row.update(decision="GO", candidate="signed-1", release_url="build-1",
-                   evidence=["https://github.com/DruHustle/onesa-mobile/actions/runs/123"],
+        candidate = "a" * 40
+        row.update(decision="GO", candidate=candidate, release_url="build-1",
+                   evidence=self.evidence_for(row["product"], candidate),
                    role_tested="customer", observed_result="Installed workflow completed",
                    operating_limits="Tested hardware", blocker="")
         self.assertTrue(any("store acceptance receipt" in x for x in validate(self.document)))
@@ -120,9 +135,10 @@ class PortfolioGateTests(unittest.TestCase):
                 with self.subTest(group=group, field=field):
                     doc = copy.deepcopy(self.document)
                     row = doc[group][0]
-                    row.update(decision="GO", candidate="build-1", environment="pilot", role_tested="operator",
+                    candidate = "b" * 40
+                    row.update(decision="GO", candidate=candidate, environment="pilot", role_tested="operator",
                                observed_result="Completed", support_owner="operator", operating_limits="One pilot",
-                               evidence=["https://example.org/receipt"], blocker="")
+                               evidence=self.evidence_for(row["product"], candidate), blocker="")
                     # A valid GO fixture is essential: otherwise this test
                     # could pass for unrelated missing release metadata.
                     self.assertEqual(validate(doc), [])
@@ -157,11 +173,42 @@ class PortfolioGateTests(unittest.TestCase):
         self.assertTrue(any("scope support_owner must be nonblank" in error for error in errors))
         self.assertTrue(any("scope blocker must be text" in error for error in errors))
 
+    def test_go_requires_full_source_commit_and_same_repository_workflow_run(self):
+        row = self.document["entries"][0]
+        candidate = "d" * 40
+        row.update(decision="GO", candidate=candidate, release_url="https://mobile.onesa.eu",
+                   evidence=self.evidence_for(row["product"], candidate), workflow="Customer sign-in",
+                   environment="production", role_tested="customer", observed_result="Sign-in completed",
+                   support_owner="mobile", operating_limits="Web production only", blocker="")
+        self.assertEqual(validate(self.document), [])
+        row["candidate"] = candidate[:8]
+        self.assertTrue(any("exact candidate commit" in error for error in validate(self.document)))
+        row["candidate"] = candidate
+        row["evidence"] = self.evidence_for(row["product"], candidate)
+        row["evidence"][1] = "https://github.com/DruHustle/onesa-documents/actions/runs/123"
+        self.assertTrue(any("exact candidate commit" in error for error in validate(self.document)))
+        row["evidence"] = [f"https://github.com/DruHustle/onesa-mobile/actions/runs/123"]
+        self.assertTrue(any("exact candidate commit" in error for error in validate(self.document)))
+
+    def test_go_rejects_unverified_test_role_and_store_receipt(self):
+        row = next(x for x in self.document["entries"] if x["platform"] == "ios")
+        candidate = "e" * 40
+        row.update(decision="GO", candidate=candidate, release_url="build-1",
+                   evidence=self.evidence_for(row["product"], candidate), workflow="Native customer flow",
+                   environment="TestFlight", role_tested="not tested", observed_result="Completed",
+                   support_owner="mobile", operating_limits="Tested device", blocker="",
+                   store_submission="accepted", store_receipt="pending")
+        errors = validate(self.document)
+        self.assertTrue(any("observed role-specific workflow" in error for error in errors))
+        row["role_tested"] = "customer"
+        self.assertTrue(any("store acceptance receipt" in error for error in validate(self.document)))
+
     def test_verified_candidate_has_no_blocker(self):
         row = self.document["entries"][0]
-        row.update(decision="GO", candidate="sha256:verified", environment="pilot",
+        candidate = "c" * 40
+        row.update(decision="GO", candidate=candidate, environment="pilot",
                    release_url="https://mobile.onesa.eu",
-                   evidence=["https://github.com/DruHustle/onesa-mobile/actions/runs/123"],
+                   evidence=self.evidence_for(row["product"], candidate),
                    role_tested="customer", observed_result="Customer task completed",
                    operating_limits="Web-only validated scope", support_owner="mobile",
                    blocker="")
