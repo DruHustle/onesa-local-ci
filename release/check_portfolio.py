@@ -69,6 +69,48 @@ def validate(document, require_go=False):
             errors.append(f"{key}: NO-GO")
     for key in sorted(EXPECTED - seen):
         errors.append(f"missing client {key}")
+    required_scopes = (
+        {("pasofi", "wifi-site", site) for site in ("K1", "G1", "G2", "G3")}
+        | {("pasofi", "payment-channel", channel) for channel in (
+            "Stripe web card", "Apple Pay iPhone", "Google Pay Android"
+        )}
+        | {("onesa-drone", "physical-task", "Chubory A77 supervised inspection"),
+           ("onesa-robot", "physical-task", "supervised inspection on actual controller")}
+        | {(product, "operational-pilot", "customer site operational workflow")
+           for product in ("smart-farmer", "smart-logistics", "smart-factory")}
+        | {("onesa-mobile", "provider-integration", "satellite-to-phone partner adapter")}
+    )
+    scope_rows = document.get("scope_gates")
+    if not isinstance(scope_rows, list):
+        errors.append("scope_gates must be an array")
+        return errors
+    observed_scopes = set()
+    for index, row in enumerate(scope_rows):
+        if not isinstance(row, dict):
+            errors.append(f"scope {index}: must be an object")
+            continue
+        key = (row.get("product"), row.get("kind"), row.get("scope"))
+        if key in observed_scopes:
+            errors.append(f"duplicate scope {key}")
+        observed_scopes.add(key)
+        if key not in required_scopes:
+            errors.append(f"unknown scope {key}")
+        if row.get("decision") not in ("GO", "NO-GO"):
+            errors.append(f"{key}: invalid scope decision")
+        if not isinstance(row.get("owner"), str) or not row.get("owner"):
+            errors.append(f"{key}: scope owner required")
+        evidence = row.get("evidence")
+        if not isinstance(evidence, list):
+            errors.append(f"{key}: scope evidence must be an array")
+        if row.get("decision") == "GO":
+            if not evidence or not all(isinstance(link, str) and link.startswith("https://") for link in evidence):
+                errors.append(f"{key}: GO requires scope acceptance evidence")
+            if row.get("blocker"):
+                errors.append(f"{key}: GO cannot retain scope blocker")
+        elif require_go:
+            errors.append(f"{key}: scope NO-GO")
+    for key in sorted(required_scopes - observed_scopes):
+        errors.append(f"missing scope {key}")
     return errors
 
 
