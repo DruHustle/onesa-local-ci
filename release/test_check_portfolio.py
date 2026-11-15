@@ -22,6 +22,12 @@ class PortfolioGateTests(unittest.TestCase):
         self.assertEqual(len(self.document["scope_gates"]), 13)
         self.assertEqual(validate(self.document), [])
 
+    def test_scope_go_requires_real_candidate_and_operating_limits(self):
+        gate = self.document["scope_gates"][0]
+        gate.update(decision="GO", blocker="",
+                    evidence=["https://github.com/DruHustle/pasofi/actions/runs/123"])
+        self.assertTrue(any("scoped candidate" in x for x in validate(self.document)))
+
     def test_missing_wifi_site_is_rejected(self):
         self.document["scope_gates"] = [
             row for row in self.document["scope_gates"]
