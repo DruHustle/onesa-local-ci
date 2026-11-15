@@ -1,6 +1,7 @@
 import datetime as dt
 import importlib.util
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 MODULE = Path(__file__).with_name("cleanup_artifacts.py")
@@ -13,12 +14,16 @@ class ArtifactCleanupTests(unittest.TestCase):
     def setUp(self):
         self.now = dt.datetime(2026, 11, 15, tzinfo=dt.timezone.utc)
         self.repo_id = 1455347405
+        self.workflow_allowlist = patch.object(cleanup, "DISPOSABLE_WORKFLOW_IDS", frozenset({789}))
+        self.workflow_allowlist.start()
+        self.addCleanup(self.workflow_allowlist.stop)
 
     def item(self, name, created, expired=False):
         return {"id": 123, "name": name, "created_at": created,
                 "expired": expired, "size_in_bytes": 500,
-                "workflow_run": {"id": 456, "repository_id": self.repo_id,
-                                 "head_repository_id": self.repo_id,
+                "workflow_run": {"id": 456, "workflow_id": 789, "status": "completed",
+                                 "conclusion": "success", "event": "push",
+                                 "repository_id": self.repo_id, "head_repository_id": self.repo_id,
                                  "head_sha": "a" * 40, "head_branch": "feature/ci-cleanup-test"}}
 
     def test_old_disposable_artifact_is_eligible(self):
@@ -72,6 +77,27 @@ class ArtifactCleanupTests(unittest.TestCase):
             artifact = dict(valid, expired=bad_expired)
             with self.subTest(expired=bad_expired):
                 self.assertFalse(cleanup.eligible(artifact, self.now, 14, self.repo_id))
+
+
+    def test_cleanup_requires_an_explicitly_allowlisted_successful_source_workflow(self):
+        valid = self.item("ci-old", "2026-09-01T00:00:00Z")
+        self.assertTrue(cleanup.eligible(valid, self.now, 14, self.repo_id))
+        for changes in (
+            {"workflow_id": 790},
+            {"status": "in_progress"},
+            {"status": "completed", "conclusion": "failure"},
+            {"status": "completed", "conclusion": "cancelled"},
+            {"event": "pull_request"},
+            {"workflow_id": True},
+        ):
+            artifact = dict(valid, workflow_run=dict(valid["workflow_run"], **changes))
+            with self.subTest(changes=changes):
+                self.assertFalse(cleanup.eligible(artifact, self.now, 14, self.repo_id))
+
+    def test_empty_production_workflow_allowlist_never_authorizes_deletion(self):
+        valid = self.item("ci-old", "2026-09-01T00:00:00Z")
+        with patch.object(cleanup, "DISPOSABLE_WORKFLOW_IDS", frozenset()):
+            self.assertFalse(cleanup.eligible(valid, self.now, 14, self.repo_id))
 
     def test_artifacts_must_be_source_bound_and_have_valid_size(self):
         valid = self.item("ci-old", "2026-09-01T00:00:00Z")
