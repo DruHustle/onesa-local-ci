@@ -54,12 +54,14 @@ class RunnerTest(unittest.TestCase):
                     return status.encode()
                 if command == ("rev-parse", "HEAD"):
                     return head.encode()
+                if command == ("show", "HEAD:infra/local-runner/guest.sh"):
+                    return b"#!/usr/bin/env bash\\nset -euo pipefail\\n"
                 raise AssertionError(args)
             with patch.object(boot, "run", side_effect=fake_run), \
                  patch.object(boot, "api", return_value={"sha": remote_sha}):
                 return boot.trusted_checkout()
 
-        self.assertIsNone(exercise())
+        self.assertEqual(exercise(), b"#!/usr/bin/env bash\\nset -euo pipefail\\n")
         for kwargs in (
             {"status": " M infra/local-runner/guest.sh"},
             {"status": "?? untracked.py"},
@@ -143,7 +145,8 @@ class RunnerTest(unittest.TestCase):
                 patch.object(boot.platform, 'machine', return_value='arm64'), \
                 patch.object(boot.shutil, 'which', return_value='/bin/tool'), \
                 patch.object(boot.os, 'geteuid', return_value=501), patch.object(boot, 'controller'), \
-                patch.object(boot, 'trusted_checkout'), patch.object(boot, 'provision_vm'), patch('builtins.print'), \
+                patch.object(boot, 'trusted_checkout', return_value=(boot.HERE / 'guest.sh').read_bytes()), \
+                patch.object(boot, 'provision_vm'), patch('builtins.print'), \
                 patch.object(boot, 'guest', side_effect=[b'', None, interrupted_setup, configured, None, None]) as guest, \
                 patch.object(boot, 'remote_runner', side_effect=[None, offline, registered]), \
                 patch.object(boot, 'api', return_value={'token': 'synthetic-registration'}) as api, \
@@ -293,7 +296,7 @@ systemctl() {
                             subprocess.run(command, stdin=receiver, check=True)
 
                 with patch.object(boot, 'guest', side_effect=simulate_guest):
-                    boot.stage_guest_setup()
+                    boot.stage_guest_setup(source)
                 self.assertEqual(target.read_bytes(), source)
                 self.assertEqual(target.stat().st_mode & 0o777, 0o700)
 

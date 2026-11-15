@@ -92,6 +92,12 @@ def trusted_checkout():
     require(isinstance(remote_sha, str) and re.fullmatch(r'[0-9a-f]{40}', remote_sha)
             and local_sha == remote_sha,
             'Checkout must be the exact current owner-reviewed main commit.')
+    # Read the guest script from the verified Git object, not from the working
+    # tree after VM provisioning, to close the edit-between-check-and-use gap.
+    script = run('git', '-C', str(root), 'show', 'HEAD:infra/local-runner/guest.sh', capture=True)
+    require(isinstance(script, bytes) and script.startswith(b'#!/usr/bin/env bash'),
+            'Verified main does not contain the expected guest setup script.')
+    return script
 
 
 def instances():
@@ -123,10 +129,11 @@ def guest(*args, **kwargs):
     return run('limactl', 'shell', '--tty=false', '--workdir=/', VM, *args, **kwargs)
 
 
-def stage_guest_setup():
+def stage_guest_setup(script):
     # A non-PTY SSH session may deliver stdin through a socket. Read the open descriptor directly.
+    require(isinstance(script, bytes) and script, 'Verified guest setup script bytes are required.')
     guest('sudo', 'sh', '-c', 'umask 077; cat > "$1" && chmod 0700 "$1"', 'sh', '/run/onesa-ci-bootstrap',
-          data=(HERE / 'guest.sh').read_bytes())
+          data=script)
 
 
 def remote_runner():
@@ -142,7 +149,7 @@ def configure():
     require(shutil.which('gh') and shutil.which('limactl'), 'Install GitHub CLI and Lima on this Mac first.')
     require(os.geteuid() != 0, 'Run as the signed-in macOS user.')
     controller()
-    trusted_checkout()
+    guest_script = trusted_checkout()
     state = Path.home() / 'Library/Application Support/Onesa/local-ci'
     state.mkdir(mode=0o700, parents=True, exist_ok=True)
     with (state / 'setup.lock').open('a') as lock:
@@ -158,7 +165,7 @@ def configure():
                     'Local and GitHub registration disagree. Inspect the existing runner before proceeding.')
         else:
             require(not remote, 'The name is already registered to another or missing guest.')
-        stage_guest_setup()
+        stage_guest_setup(guest_script)
         token = b'' if local else api('actions/runners/registration-token', 'POST')['token'].encode() + b'\n'
         guest('sudo', 'bash', '/run/onesa-ci-bootstrap', data=token)
         run('limactl', 'start-at-login', VM)
