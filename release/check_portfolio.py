@@ -111,7 +111,7 @@ def has_observation(row):
     if any(marker in evidence_text for marker in UNVERIFIED_MARKERS):
         return False
     outcome = row.get("observed_result", "").casefold()
-    return not any(re.search(r"(?<!\\w)" + re.escape(marker) + r"(?!\\w)", outcome)
+    return not any(re.search(r"(?<!\w)" + re.escape(marker) + r"(?!\w)", outcome)
                    for marker in OBSERVED_FAILURE_MARKERS)
 
 
@@ -192,8 +192,8 @@ def verify_source_runs(document, fetch_json=fetch_source_run):
             if not isinstance(candidate, str) or not re.fullmatch(r"[0-9a-f]{40}", candidate):
                 continue  # Static validation reports the malformed candidate.
             repository = SOURCE_REPOSITORIES.get(product)
-            run_ids = source_run_references(product, row.get("evidence"))
-            if not repository or not run_ids:
+            run_refs = source_run_references(product, row.get("evidence"))
+            if not repository or not run_refs:
                 continue  # Static validation reports missing source-bound links.
             for run_id, cited_attempt in run_refs:
                 cache_key = (repository, run_id)
