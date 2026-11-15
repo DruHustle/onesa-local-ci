@@ -3,6 +3,7 @@
 import argparse
 import datetime as dt
 import json
+import re
 import subprocess
 
 DISPOSABLE_PREFIXES = ("ci-", "preview-", "browser-", "test-")
@@ -21,6 +22,13 @@ def eligible(artifact, now, days, repo_id):
         return False
     if any(type(provenance.get(field)) is not int or provenance[field] != repo_id
            for field in ("repository_id", "head_repository_id")):
+        return False
+    # Repository IDs alone do not identify the source revision. Require the
+    # full workflow head SHA and branch before treating an artifact as bound
+    # to an auditable source run.
+    if not isinstance(provenance.get("head_sha"), str) or not re.fullmatch(
+        r"[0-9a-f]{40}", provenance["head_sha"]
+    ) or not isinstance(provenance.get("head_branch"), str) or not provenance["head_branch"].strip():
         return False
     size = artifact.get("size_in_bytes")
     if type(size) is not int or size < 0:
