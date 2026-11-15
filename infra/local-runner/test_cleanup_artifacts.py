@@ -96,6 +96,38 @@ class ArtifactCleanupTests(unittest.TestCase):
                 cleanup.main()
             gh.assert_not_called()
 
+    def test_apply_only_deletes_confirmed_eligible_ids(self):
+        import json
+        from unittest.mock import patch
+        old = self.item("ci-old", "2026-09-01T00:00:00Z")
+        other = dict(old, id=789, name="test-transient")
+        calls = []
+
+        def fake_gh(*args):
+            calls.append(args)
+            if args == ("api", "repos/DruHustle/onesa-local-ci"):
+                return json.dumps({"full_name": "DruHustle/onesa-local-ci", "id": self.repo_id})
+            if args[:2] == ("api", "--paginate"):
+                return "\n".join(json.dumps(item) for item in (old, other))
+            if args[:3] == ("api", "-X", "DELETE"):
+                return ""
+            raise AssertionError(args)
+
+        with patch.object(cleanup, "gh", side_effect=fake_gh):
+            with patch("sys.argv", ["cleanup", "--apply", "--confirm-repo",
+                                    "DruHustle/onesa-local-ci", "--confirm-id", "123"]):
+                cleanup.main()
+            self.assertIn(("api", "-X", "DELETE",
+                           "repos/DruHustle/onesa-local-ci/actions/artifacts/123"), calls)
+            self.assertNotIn(("api", "-X", "DELETE",
+                              "repos/DruHustle/onesa-local-ci/actions/artifacts/789"), calls)
+            calls.clear()
+            with patch("sys.argv", ["cleanup", "--apply", "--confirm-repo",
+                                    "DruHustle/onesa-local-ci", "--confirm-id", "999"]):
+                with self.assertRaises(SystemExit):
+                    cleanup.main()
+            self.assertFalse(any(x[:3] == ("api", "-X", "DELETE") for x in calls))
+
     def test_expired_artifacts_not_redeleted(self):
         self.assertFalse(cleanup.eligible(
             self.item("ci-old", "2026-09-01T00:00:00Z", True),
