@@ -54,6 +54,21 @@ class ArtifactCleanupTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertFalse(cleanup.eligible(artifact, self.now, 14))
 
+    def test_untrusted_artifact_id_and_expiration_fail_closed(self):
+        valid = self.item("ci-old", "2026-09-01T00:00:00Z")
+        self.assertTrue(cleanup.eligible(valid, self.now, 14))
+        for invalid in (None, [], "bad", 12):
+            with self.subTest(record=invalid):
+                self.assertFalse(cleanup.eligible(invalid, self.now, 14))
+        for bad_id in (None, True, "123", 0, -2):
+            artifact = dict(valid, id=bad_id)
+            with self.subTest(id=bad_id):
+                self.assertFalse(cleanup.eligible(artifact, self.now, 14))
+        for bad_expired in (None, "false", 0):
+            artifact = dict(valid, expired=bad_expired)
+            with self.subTest(expired=bad_expired):
+                self.assertFalse(cleanup.eligible(artifact, self.now, 14))
+
     def test_expired_artifacts_not_redeleted(self):
         self.assertFalse(cleanup.eligible(
             self.item("ci-old", "2026-09-01T00:00:00Z", True),
