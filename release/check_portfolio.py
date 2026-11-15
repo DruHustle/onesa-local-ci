@@ -33,6 +33,11 @@ def linked_evidence(evidence):
     return True
 
 
+def qualified_environment(row):
+    environment = row.get("environment")
+    return nonblank(environment) and not environment.strip().casefold().endswith("(unverified)")
+
+
 def observed(row):
     return (nonblank(row.get("observed_result"))
             and row["observed_result"].strip() not in
@@ -81,7 +86,7 @@ def validate(document, require_go=False):
                 errors.append(f"{key}: GO requires a deployed URL or installed build reference")
             if not linked_evidence(row.get("evidence")):
                 errors.append(f"{key}: GO requires linked acceptance evidence")
-            if not all(nonblank(row.get(field)) for field in ("owner", "workflow", "environment", "role_tested")) or not observed(row):
+            if not all(nonblank(row.get(field)) for field in ("owner", "workflow", "role_tested")) or not observed(row) or not qualified_environment(row):
                 errors.append(f"{key}: GO requires an observed role-specific workflow and environment")
             if not nonblank(row.get("support_owner")) or not nonblank(row.get("operating_limits")) or row["operating_limits"].strip() == "Not qualified":
                 errors.append(f"{key}: GO requires support ownership and operating limits")
@@ -141,7 +146,7 @@ def validate(document, require_go=False):
             if not all(nonblank(row.get(field)) for field in (
                 "candidate", "environment", "role_tested", "observed_result",
                 "support_owner", "operating_limits"
-            )) or row["operating_limits"].strip() == "Not qualified" or not observed(row):
+            )) or row["operating_limits"].strip() == "Not qualified" or not observed(row) or not qualified_environment(row):
                 errors.append(f"{key}: GO requires scoped candidate, observed result, operator and limits")
             if row.get("blocker"):
                 errors.append(f"{key}: GO cannot retain scope blocker")

@@ -54,7 +54,7 @@ class PortfolioGateTests(unittest.TestCase):
 
     def test_blank_or_unobserved_evidence_cannot_pass(self):
         for group in ("entries", "scope_gates"):
-            for field, value in (("environment", " "), ("operating_limits", ""), ("observed_result", "Not tested at site/provider/hardware"), ("evidence", ["https://"])):
+            for field, value in (("environment", " "), ("environment", "production (unverified)"), ("operating_limits", ""), ("observed_result", "Not tested at site/provider/hardware"), ("evidence", ["https://"])):
                 with self.subTest(group=group, field=field):
                     doc = copy.deepcopy(self.document)
                     row = doc[group][0]
@@ -72,7 +72,7 @@ class PortfolioGateTests(unittest.TestCase):
 
     def test_verified_candidate_has_no_blocker(self):
         row = self.document["entries"][0]
-        row.update(decision="GO", candidate="sha256:verified",
+        row.update(decision="GO", candidate="sha256:verified", environment="pilot",
                    release_url="https://mobile.onesa.eu",
                    evidence=["https://github.com/DruHustle/onesa-mobile/actions/runs/123"],
                    role_tested="customer", observed_result="Customer task completed",
