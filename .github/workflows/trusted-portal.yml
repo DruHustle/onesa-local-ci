@@ -1,6 +1,10 @@
 name: Trusted local Portal checks
 run-name: Portal ${{ inputs.source_sha }} (local=${{ inputs.run_local }})
 on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
     inputs:
       source_sha:
@@ -16,6 +20,22 @@ concurrency:
   group: trusted-local-portal
   cancel-in-progress: false
 jobs:
+  controller-checks:
+    name: Public controller checks
+    if: ${{ github.repository == 'DruHustle/onesa-local-ci' && github.event.repository.private == false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Test local runner configuration without privileged execution
+        run: |
+          set -euo pipefail
+          bash -n infra/local-runner/guest.sh
+          python3 -m unittest discover -s infra/local-runner -v
   local:
     if: ${{ inputs.run_local && github.event_name == 'workflow_dispatch' && github.repository == 'DruHustle/onesa-local-ci' && github.event.repository.private == true && github.ref == 'refs/heads/main' && github.actor == 'DruHustle' && github.triggering_actor == 'DruHustle' }}
     runs-on: [self-hosted, Linux, ARM64, onesa-portal-local]
