@@ -74,14 +74,17 @@ def main():
         parser.error("Repository identity could not be verified")
     lines = gh("api", "--paginate", "--jq", ".artifacts[] | @json",
                f"repos/{args.repo}/actions/artifacts").splitlines()
-    now = dt.datetime.now(UTC)
-    candidates = [item for line in lines if (item := json.loads(line))
-                  and eligible(item, now, args.older_than_days, metadata["id"])]
-    # Pagination may replay an artifact record; never issue duplicate DELETEs
-    # or let an ambiguous inventory authorize a destructive operation.
-    ids = [item["id"] for item in candidates]
+    records = [json.loads(line) for line in lines]
+    # Check the complete paginated inventory, not only eligible candidates:
+    # a duplicate whose second copy has malformed metadata is still ambiguous.
+    # Abort before any DELETE rather than letting the valid-looking copy win.
+    ids = [item["id"] for item in records
+           if isinstance(item, dict) and type(item.get("id")) is int and item["id"] > 0]
     if len(ids) != len(set(ids)):
         parser.error("Duplicate artifact IDs in API listing; no deletion permitted")
+    now = dt.datetime.now(UTC)
+    candidates = [item for item in records
+                  if eligible(item, now, args.older_than_days, metadata["id"])]
     if args.apply:
         approved = set(args.confirm_id)
         if len(approved) != len(args.confirm_id) or not approved <= {item["id"] for item in candidates}:
