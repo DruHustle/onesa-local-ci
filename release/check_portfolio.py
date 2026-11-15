@@ -3,6 +3,7 @@
 import argparse
 import json
 from pathlib import Path
+import re
 from urllib.parse import urlsplit
 
 PRODUCTS = (
@@ -12,6 +13,21 @@ PRODUCTS = (
 WEB_ONLY = ("company-portal", "documents-public", "documents-internal", "identity")
 EXPECTED = {(p, c) for p in PRODUCTS for c in ("web", "ios", "android")}
 EXPECTED |= {(p, "web") for p in WEB_ONLY}
+
+SOURCE_REPOSITORIES = {
+    "onesa-mobile": "onesa-mobile",
+    "pasofi": "pasofi",
+    "onesa-drone": "onesa-drone",
+    "onesa-robot": "onesa-robot",
+    "smart-farmer": "smart-farmer",
+    "smart-logistics": "smart-logistics",
+    "smart-factory": "smart-factory",
+    "onesa-ai-platform": "onesa-ai-platform",
+    "company-portal": "onesa-company-portal",
+    "documents-public": "onesa-documents",
+    "documents-internal": "onesa-documents",
+    "identity": "onesa-identity",
+}
 
 
 def nonblank(value):
@@ -33,6 +49,56 @@ def valid_evidence(link):
                 and parsed.username is None and parsed.password is None)
     except ValueError:
         return False
+
+
+UNVERIFIED_MARKERS = (
+    "unverified", "not tested", "not run", "not observed", "not verified",
+    "pending", "unknown", "no evidence",
+)
+UNQUALIFIED_LIMIT_MARKERS = (
+    "not qualified", "unqualified", "unknown", "pending", "unverified",
+    "not established", "not tested",
+)
+
+
+def has_observation(row):
+    # A GO must identify the workflow, tested role, environment and observed
+    # outcome. A nonblank phrase such as "not tested" is not acceptance.
+    fields = ("workflow", "environment", "role_tested", "observed_result")
+    values = [row.get(field) for field in fields if field in row]
+    if not all(nonblank(value) for value in values) or len(values) < 3:
+        return False
+    evidence_text = " ".join(values).casefold()
+    return not any(marker in evidence_text for marker in UNVERIFIED_MARKERS)
+
+
+def has_source_bound_evidence(product, candidate, evidence):
+    # A generic HTTPS URL or PR link does not bind acceptance to the exact
+    # candidate. Require the product's own repository commit URL and a
+    # workflow-run URL in that repository for the same full commit SHA.
+    repository = SOURCE_REPOSITORIES.get(product)
+    if not repository or not isinstance(candidate, str) or not re.fullmatch(r"[0-9a-f]{40}", candidate):
+        return False
+    if not isinstance(evidence, list):
+        return False
+    prefix = f"/DruHustle/{repository}"
+    has_commit = False
+    has_run = False
+    for link in evidence:
+        if not valid_evidence(link):
+            continue
+        parsed = urlsplit(link)
+        if parsed.hostname != "github.com" or parsed.port not in (None, 443) or parsed.query or parsed.fragment:
+            continue
+        has_commit |= parsed.path == f"{prefix}/commit/{candidate}"
+        has_run |= re.fullmatch(re.escape(prefix) + r"/actions/runs/[0-9]+(?:/attempts/[0-9]+)?", parsed.path) is not None
+    return has_commit and has_run
+
+
+def has_qualified_limits(row):
+    limits = row.get("operating_limits")
+    return (nonblank(limits) and
+            not any(marker in limits.strip().casefold() for marker in UNQUALIFIED_LIMIT_MARKERS))
 
 
 def validate(document, require_go=False):
@@ -63,6 +129,12 @@ def validate(document, require_go=False):
                       "operating_limits"):
             if not isinstance(row.get(field), str):
                 errors.append(f"{key}: {field} must be text")
+        for field in ("owner", "workflow", "environment", "observed_result",
+                      "support_owner", "operating_limits"):
+            if not nonblank(row.get(field)):
+                errors.append(f"{key}: {field} must be nonblank")
+        if row.get("decision") == "NO-GO" and not nonblank(row.get("blocker")):
+            errors.append(f"{key}: NO-GO requires a concrete blocker")
         if row.get("platform") in ("ios", "android"):
             if row.get("store_submission") not in (
                 "not-submitted", "submitted", "accepted", "rejected"
@@ -81,20 +153,21 @@ def validate(document, require_go=False):
                 valid_evidence(link) for link in row["evidence"]
             ):
                 errors.append(f"{key}: GO requires linked acceptance evidence")
+            if not has_source_bound_evidence(row["product"], row.get("candidate"), row.get("evidence")):
+                errors.append(f"{key}: GO requires exact candidate commit and workflow-run evidence in its source repository")
             if not all(nonblank(row.get(field)) for field in (
                 "owner", "workflow", "environment", "role_tested", "observed_result"
-            )) or (isinstance(row.get("observed_result"), str) and
-                   row["observed_result"].strip().casefold() == "not tested on the release candidate"):
+            )) or not has_observation(row):
                 errors.append(f"{key}: GO requires an observed role-specific workflow")
-            if not nonblank(row.get("support_owner")) or not nonblank(row.get("operating_limits")) or (
-                isinstance(row.get("operating_limits"), str) and
-                row["operating_limits"].strip().casefold() == "not qualified"
-            ):
-                errors.append(f"{key}: GO requires support ownership and operating limits")
-            if row["platform"] in ("ios", "android") and (
-                row.get("store_submission") != "accepted" or not nonblank(row.get("store_receipt"))
-            ):
-                errors.append(f"{key}: GO requires native store acceptance receipt")
+            if not nonblank(row.get("support_owner")) or not has_qualified_limits(row):
+                errors.append(f"{key}: GO requires support ownership and qualified operating limits")
+            if row["platform"] in ("ios", "android"):
+                receipt = row.get("store_receipt")
+                receipt_is_unverified = (not nonblank(receipt) or any(
+                    marker in receipt.casefold() for marker in UNVERIFIED_MARKERS
+                ))
+                if row.get("store_submission") != "accepted" or receipt_is_unverified:
+                    errors.append(f"{key}: GO requires native store acceptance receipt")
             if not isinstance(row.get("blocker"), str) or row["blocker"].strip():
                 errors.append(f"{key}: GO cannot have an open blocker")
         elif require_go:
@@ -132,8 +205,15 @@ def validate(document, require_go=False):
             errors.append(f"unknown scope {key}")
         if row.get("decision") not in ("GO", "NO-GO"):
             errors.append(f"{key}: invalid scope decision")
-        if not isinstance(row.get("owner"), str) or not row.get("owner"):
+        if not nonblank(row.get("owner")):
             errors.append(f"{key}: scope owner required")
+        if not isinstance(row.get("blocker"), str):
+            errors.append(f"{key}: scope blocker must be text")
+        elif row.get("decision") == "NO-GO" and not nonblank(row.get("blocker")):
+            errors.append(f"{key}: NO-GO scope requires a concrete blocker")
+        for field in ("environment", "observed_result", "support_owner", "operating_limits"):
+            if not nonblank(row.get(field)):
+                errors.append(f"{key}: scope {field} must be nonblank")
         evidence = row.get("evidence")
         if not isinstance(evidence, list):
             errors.append(f"{key}: scope evidence must be an array")
@@ -146,17 +226,13 @@ def validate(document, require_go=False):
                 valid_evidence(link) for link in evidence
             ):
                 errors.append(f"{key}: GO requires scope acceptance evidence")
+            if not has_source_bound_evidence(row["product"], row.get("candidate"), evidence):
+                errors.append(f"{key}: GO requires exact candidate commit and workflow-run evidence in its source repository")
             if not all(nonblank(row.get(field)) for field in (
                 "owner", "candidate", "environment", "role_tested", "observed_result",
-                "support_owner", "operating_limits"
-            )) or (
-                isinstance(row.get("operating_limits"), str)
-                and row["operating_limits"].strip().casefold() == "not qualified"
-            ) or (
-                isinstance(row.get("observed_result"), str)
-                and row["observed_result"].strip().casefold() == "not tested on the release candidate"
-            ):
-                errors.append(f"{key}: GO requires scoped candidate, observed result, operator and limits")
+                "support_owner"
+            )) or not has_qualified_limits(row) or not has_observation(row):
+                errors.append(f"{key}: GO requires scoped candidate, observed result, operator and qualified limits")
             if not isinstance(row.get("blocker"), str) or row["blocker"].strip():
                 errors.append(f"{key}: GO cannot retain scope blocker")
         elif require_go:
