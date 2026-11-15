@@ -11,7 +11,7 @@ cd onesa-local-ci
 python3 infra/local-runner/bootstrap.py
 ```
 
-The bootstrap checks the controller is private and owner-only, then checks its single workflow against this checkout. It creates a dedicated Ubuntu 24.04 ARM64 Lima guest in plain mode, with no host filesystem mounts. It verifies the official runner archive's SHA-256, registers a repository-scoped account, enables its unprivileged systemd service, enables the VM at Mac login, and reads its online labels back from GitHub. Owner `gh` credentials stay on the Mac. Rerun the same command to resume setup or verify the existing guest. It refuses to replace an existing registration on another machine or reuse a changed guest definition.
+The bootstrap checks the controller is private and owner-only, then verifies every active workflow against this checkout. Only the trusted Portal dispatcher and, once merged, the separate GitHub-hosted portfolio release gate are allowed; unknown or altered workflows block registration and resumption. It creates a dedicated Ubuntu 24.04 ARM64 Lima guest in plain mode, with no host filesystem mounts. It verifies the official runner archive's SHA-256, registers a repository-scoped account, enables its unprivileged systemd service, enables the VM at Mac login, and reads its online labels back from GitHub. Owner `gh` credentials stay on the Mac. Rerun the same command to resume setup or verify the existing guest. It refuses to replace an existing registration on another machine or reuse a changed guest definition.
 
 ## Verify a reviewed Portal revision
 

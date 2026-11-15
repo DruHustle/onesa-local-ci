@@ -17,6 +17,9 @@ REPO = 'DruHustle/onesa-local-ci'
 VM = 'onesa-portal-local-arm64'
 LABEL = 'onesa-portal-local'
 WORKFLOW = 'trusted-portal.yml'
+# The release gate is a separate, reviewed, GitHub-hosted workflow. Adding it
+# must not prevent verification/resumption of the trusted local runner.
+ALLOWED_WORKFLOWS = frozenset({WORKFLOW, 'portfolio-gates.yml'})
 
 
 def run(*args, data=None, capture=False):
@@ -34,8 +37,9 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def reviewed_workflow():
-    return HERE.parents[1] / '.github/workflows' / WORKFLOW
+def reviewed_workflow(name=WORKFLOW):
+    require(name in ALLOWED_WORKFLOWS, 'Unexpected workflow name.')
+    return HERE.parents[1] / '.github/workflows' / name
 
 
 def controller():
@@ -44,13 +48,28 @@ def controller():
             and metadata.get('default_branch') == 'main' and metadata.get('permissions', {}).get('admin'),
             'The owner-administered private controller with default main is required.')
     collaborators = api('collaborators?per_page=100')
-    require({item['login'] for item in collaborators} <= {REPO.split('/')[0]},
-            'Dedicated controller requires owner-only access.')
+    # GitHub returns at most 100 collaborators per page here. Refuse a
+    # saturated page rather than accepting a potentially partial permission
+    # inventory; this private controller must have owner-only access.
+    require(isinstance(collaborators, list) and len(collaborators) < 100
+            and all(isinstance(item, dict) and item.get('login') == REPO.split('/')[0]
+                    for item in collaborators),
+            'Dedicated controller requires a complete owner-only collaborator inventory.')
     entries = api('contents/.github/workflows?ref=main')
-    require([entry['name'] for entry in entries] == [WORKFLOW], 'Unexpected private controller workflows.')
-    content = api(f'contents/.github/workflows/{WORKFLOW}?ref=main')
-    require(base64.b64decode(content['content']) == reviewed_workflow().read_bytes(),
-            'The active controller workflow differs from this reviewed bootstrap.')
+    require(isinstance(entries, list) and len(entries) < 1000
+            and all(isinstance(entry, dict) for entry in entries),
+            'Unexpected or incomplete private controller workflow listing.')
+    names = [entry.get('name') for entry in entries]
+    require(len(names) == len(set(names)) and WORKFLOW in names
+            and set(names) <= ALLOWED_WORKFLOWS,
+            'Unexpected private controller workflows.')
+    # Check *every* active workflow against this same checkout. Otherwise an
+    # added release-gate workflow either blocks local runner resumption or can
+    # escape the original single-file integrity check.
+    for name in sorted(names):
+        content = api(f'contents/.github/workflows/{name}?ref=main')
+        require(base64.b64decode(content['content']) == reviewed_workflow(name).read_bytes(),
+                f'The active {name} workflow differs from this reviewed checkout.')
 
 
 def instances():
