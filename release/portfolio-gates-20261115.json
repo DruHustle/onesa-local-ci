@@ -11,7 +11,12 @@
       "release_url": "https://mobile.onesa.eu",
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Production workflow acceptance unverified"
+      "blocker": "Production workflow acceptance unverified",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "provider-integration",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "onesa-mobile",
@@ -22,7 +27,14 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Signed build, installed-device workflow and store receipt unverified"
+      "blocker": "Signed build, installed-device workflow and store receipt unverified",
+      "environment": "device (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "provider-integration",
+      "operating_limits": "Not qualified",
+      "store_submission": "not-submitted",
+      "store_receipt": null
     },
     {
       "product": "onesa-mobile",
@@ -33,7 +45,14 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Signed build, installed-device workflow and store receipt unverified"
+      "blocker": "Signed build, installed-device workflow and store receipt unverified",
+      "environment": "device (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "provider-integration",
+      "operating_limits": "Not qualified",
+      "store_submission": "not-submitted",
+      "store_receipt": null
     },
     {
       "product": "pasofi",
@@ -44,7 +63,12 @@
       "release_url": "https://pasofi.mobile.onesa.eu",
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Production workflow acceptance unverified"
+      "blocker": "Production workflow acceptance unverified",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "commercial-wifi",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "pasofi",
@@ -55,7 +79,14 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Signed build, installed-device workflow and store receipt unverified"
+      "blocker": "Signed build, installed-device workflow and store receipt unverified",
+      "environment": "device (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "commercial-wifi",
+      "operating_limits": "Not qualified",
+      "store_submission": "not-submitted",
+      "store_receipt": null
     },
     {
       "product": "pasofi",
@@ -66,7 +97,14 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Signed build, installed-device workflow and store receipt unverified"
+      "blocker": "Signed build, installed-device workflow and store receipt unverified",
+      "environment": "device (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "commercial-wifi",
+      "operating_limits": "Not qualified",
+      "store_submission": "not-submitted",
+      "store_receipt": null
     },
     {
       "product": "onesa-drone",
@@ -77,7 +115,12 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Production workflow acceptance unverified"
+      "blocker": "Production workflow acceptance unverified",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "hardware",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "onesa-drone",
@@ -88,7 +131,14 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Signed build, installed-device workflow and store receipt unverified"
+      "blocker": "Signed build, installed-device workflow and store receipt unverified",
+      "environment": "device (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "hardware",
+      "operating_limits": "Not qualified",
+      "store_submission": "not-submitted",
+      "store_receipt": null
     },
     {
       "product": "onesa-drone",
@@ -99,7 +149,14 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Signed build, installed-device workflow and store receipt unverified"
+      "blocker": "Signed build, installed-device workflow and store receipt unverified",
+      "environment": "device (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "hardware",
+      "operating_limits": "Not qualified",
+      "store_submission": "not-submitted",
+      "store_receipt": null
     },
     {
       "product": "onesa-robot",
@@ -110,7 +167,12 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Production workflow acceptance unverified"
+      "blocker": "Production workflow acceptance unverified",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "hardware",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "onesa-robot",
@@ -121,7 +183,14 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Signed build, installed-device workflow and store receipt unverified"
+      "blocker": "Signed build, installed-device workflow and store receipt unverified",
+      "environment": "device (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "hardware",
+      "operating_limits": "Not qualified",
+      "store_submission": "not-submitted",
+      "store_receipt": null
     },
     {
       "product": "onesa-robot",
@@ -132,7 +201,14 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Signed build, installed-device workflow and store receipt unverified"
+      "blocker": "Signed build, installed-device workflow and store receipt unverified",
+      "environment": "device (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "hardware",
+      "operating_limits": "Not qualified",
+      "store_submission": "not-submitted",
+      "store_receipt": null
     },
     {
       "product": "smart-farmer",
@@ -143,7 +219,12 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Production workflow acceptance unverified"
+      "blocker": "Production workflow acceptance unverified",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "operations",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "smart-farmer",
@@ -154,7 +235,14 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Signed build, installed-device workflow and store receipt unverified"
+      "blocker": "Signed build, installed-device workflow and store receipt unverified",
+      "environment": "device (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "operations",
+      "operating_limits": "Not qualified",
+      "store_submission": "not-submitted",
+      "store_receipt": null
     },
     {
       "product": "smart-farmer",
@@ -165,7 +253,14 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Signed build, installed-device workflow and store receipt unverified"
+      "blocker": "Signed build, installed-device workflow and store receipt unverified",
+      "environment": "device (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "operations",
+      "operating_limits": "Not qualified",
+      "store_submission": "not-submitted",
+      "store_receipt": null
     },
     {
       "product": "smart-logistics",
@@ -176,7 +271,12 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Production workflow acceptance unverified"
+      "blocker": "Production workflow acceptance unverified",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "operations",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "smart-logistics",
@@ -187,7 +287,14 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Signed build, installed-device workflow and store receipt unverified"
+      "blocker": "Signed build, installed-device workflow and store receipt unverified",
+      "environment": "device (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "operations",
+      "operating_limits": "Not qualified",
+      "store_submission": "not-submitted",
+      "store_receipt": null
     },
     {
       "product": "smart-logistics",
@@ -198,7 +305,14 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Signed build, installed-device workflow and store receipt unverified"
+      "blocker": "Signed build, installed-device workflow and store receipt unverified",
+      "environment": "device (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "operations",
+      "operating_limits": "Not qualified",
+      "store_submission": "not-submitted",
+      "store_receipt": null
     },
     {
       "product": "smart-factory",
@@ -209,7 +323,12 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Production workflow acceptance unverified"
+      "blocker": "Production workflow acceptance unverified",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "operations",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "smart-factory",
@@ -220,7 +339,14 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Signed build, installed-device workflow and store receipt unverified"
+      "blocker": "Signed build, installed-device workflow and store receipt unverified",
+      "environment": "device (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "operations",
+      "operating_limits": "Not qualified",
+      "store_submission": "not-submitted",
+      "store_receipt": null
     },
     {
       "product": "smart-factory",
@@ -231,7 +357,14 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Signed build, installed-device workflow and store receipt unverified"
+      "blocker": "Signed build, installed-device workflow and store receipt unverified",
+      "environment": "device (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "operations",
+      "operating_limits": "Not qualified",
+      "store_submission": "not-submitted",
+      "store_receipt": null
     },
     {
       "product": "onesa-ai-platform",
@@ -242,7 +375,12 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Production workflow acceptance unverified"
+      "blocker": "Production workflow acceptance unverified",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "ai",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "onesa-ai-platform",
@@ -253,7 +391,14 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Signed build, installed-device workflow and store receipt unverified"
+      "blocker": "Signed build, installed-device workflow and store receipt unverified",
+      "environment": "device (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "ai",
+      "operating_limits": "Not qualified",
+      "store_submission": "not-submitted",
+      "store_receipt": null
     },
     {
       "product": "onesa-ai-platform",
@@ -264,7 +409,14 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [],
-      "blocker": "Signed build, installed-device workflow and store receipt unverified"
+      "blocker": "Signed build, installed-device workflow and store receipt unverified",
+      "environment": "device (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "ai",
+      "operating_limits": "Not qualified",
+      "store_submission": "not-submitted",
+      "store_receipt": null
     },
     {
       "product": "company-portal",
@@ -275,7 +427,12 @@
       "release_url": "https://portal.onesa.eu/admin",
       "workflow": "Portal content admin and role isolation",
       "evidence": [],
-      "blocker": "Production browser and role acceptance unverified"
+      "blocker": "Production browser and role acceptance unverified",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "portal",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "documents-public",
@@ -286,7 +443,12 @@
       "release_url": "https://docs.onesa.eu",
       "workflow": "Anonymous published deep link, search and download",
       "evidence": [],
-      "blocker": "Production browser and role acceptance unverified"
+      "blocker": "Production browser and role acceptance unverified",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "documents",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "documents-internal",
@@ -297,7 +459,12 @@
       "release_url": "https://docs.internal.onesa.eu",
       "workflow": "Authorized/unauthorized engineering and HR access",
       "evidence": [],
-      "blocker": "Production browser and role acceptance unverified"
+      "blocker": "Production browser and role acceptance unverified",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "documents",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "identity",
@@ -308,7 +475,12 @@
       "release_url": "https://auth.onesa.eu",
       "workflow": "OIDC, registration, MFA, recovery and return",
       "evidence": [],
-      "blocker": "Production browser and role acceptance unverified"
+      "blocker": "Production browser and role acceptance unverified",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "identity",
+      "operating_limits": "Not qualified"
     }
   ]
 }
