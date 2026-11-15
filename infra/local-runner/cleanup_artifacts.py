@@ -34,7 +34,7 @@ def eligible(artifact, now, days, repo_id):
     # Never clean artifacts originating from protected/release branches,
     # even when their names happen to use a disposable prefix.
     protected_branch = branch.casefold()
-    if (protected_branch in {"main", "master"}
+    if (protected_branch in {"main", "master", "release", "production", "hotfix"}
             or protected_branch.startswith(("release/", "production/", "hotfix/"))):
         return False
     size = artifact.get("size_in_bytes")

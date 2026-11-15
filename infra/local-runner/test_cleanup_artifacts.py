@@ -145,8 +145,8 @@ class ArtifactCleanupTests(unittest.TestCase):
 
     def test_protected_and_release_branch_artifacts_are_never_eligible(self):
         valid = self.item("ci-old", "2026-09-01T00:00:00Z")
-        for branch in ("main", "master", "release/portfolio-gates-20261115",
-                       "production", "production/hotfix", "hotfix/urgent"):
+        for branch in ("main", "master", "release", "release/portfolio-gates-20261115",
+                       "production", "production/hotfix", "hotfix", "hotfix/urgent"):
             artifact = dict(valid, workflow_run=dict(valid["workflow_run"], head_branch=branch))
             with self.subTest(branch=branch):
                 self.assertFalse(cleanup.eligible(artifact, self.now, 14, self.repo_id))
