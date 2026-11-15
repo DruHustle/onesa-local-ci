@@ -34,6 +34,16 @@ class ArtifactCleanupTests(unittest.TestCase):
                 self.item(name, "2026-09-01T00:00:00Z"),
                 self.now, 14))
 
+    def test_missing_or_invalid_creation_time_never_authorizes_deletion(self):
+        for timestamp in (None, "", "not-a-timestamp", "2026-09-01T00:00:00"):
+            artifact = self.item("ci-old", "2026-09-01T00:00:00Z")
+            if timestamp is None:
+                artifact.pop("created_at")
+            else:
+                artifact["created_at"] = timestamp
+            with self.subTest(timestamp=timestamp):
+                self.assertFalse(cleanup.eligible(artifact, self.now, 14))
+
     def test_expired_artifacts_not_redeleted(self):
         self.assertFalse(cleanup.eligible(
             self.item("ci-old", "2026-09-01T00:00:00Z", True),
