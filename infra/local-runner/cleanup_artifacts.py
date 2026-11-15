@@ -29,7 +29,7 @@ def eligible(artifact, now, days, repo_id):
     if type(artifact_id) is not int or artifact_id <= 0 or artifact.get("expired") is not False:
         return False
     name = artifact.get("name")
-    if not isinstance(name, str) or not any(
+    if not isinstance(name, str) or not name.isprintable() or not any(
         name.startswith(prefix) for prefix in DISPOSABLE_PREFIXES
     ):
         return False
@@ -77,6 +77,11 @@ def main():
     now = dt.datetime.now(UTC)
     candidates = [item for line in lines if (item := json.loads(line))
                   and eligible(item, now, args.older_than_days, metadata["id"])]
+    # Pagination may replay an artifact record; never issue duplicate DELETEs
+    # or let an ambiguous inventory authorize a destructive operation.
+    ids = [item["id"] for item in candidates]
+    if len(ids) != len(set(ids)):
+        parser.error("Duplicate artifact IDs in API listing; no deletion permitted")
     if args.apply:
         approved = set(args.confirm_id)
         if len(approved) != len(args.confirm_id) or not approved <= {item["id"] for item in candidates}:

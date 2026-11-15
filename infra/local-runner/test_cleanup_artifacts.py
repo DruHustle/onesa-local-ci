@@ -128,6 +128,33 @@ class ArtifactCleanupTests(unittest.TestCase):
                     cleanup.main()
             self.assertFalse(any(x[:3] == ("api", "-X", "DELETE") for x in calls))
 
+    def test_unprintable_artifact_names_are_not_eligible(self):
+        for name in ("ci-old\nDELETE 9", "preview-\x1b[31m", "test-\u2028other"):
+            with self.subTest(name=name):
+                self.assertFalse(cleanup.eligible(self.item(name, "2026-09-01T00:00:00Z"),
+                                                  self.now, 14, self.repo_id))
+
+    def test_duplicate_inventory_aborts_before_any_delete(self):
+        import json
+        from unittest.mock import patch
+        old = self.item("ci-old", "2026-09-01T00:00:00Z")
+        calls = []
+
+        def fake_gh(*args):
+            calls.append(args)
+            if args == ("api", "repos/DruHustle/onesa-local-ci"):
+                return json.dumps({"full_name": "DruHustle/onesa-local-ci", "id": self.repo_id})
+            if args[:2] == ("api", "--paginate"):
+                return "\n".join(json.dumps(item) for item in (old, old))
+            raise AssertionError(args)
+
+        with patch.object(cleanup, "gh", side_effect=fake_gh):
+            with patch("sys.argv", ["cleanup", "--apply", "--confirm-repo",
+                                    "DruHustle/onesa-local-ci", "--confirm-id", "123"]):
+                with self.assertRaises(SystemExit):
+                    cleanup.main()
+        self.assertFalse(any(call[:3] == ("api", "-X", "DELETE") for call in calls))
+
     def test_expired_artifacts_not_redeleted(self):
         self.assertFalse(cleanup.eligible(
             self.item("ci-old", "2026-09-01T00:00:00Z", True),
