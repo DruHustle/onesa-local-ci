@@ -288,5 +288,17 @@ systemctl() {
                                 exec(check, {})
 
 
+    def test_all_external_workflow_actions_are_pinned_to_full_commit_shas(self):
+        for name in ('portfolio-gates.yml', boot.WORKFLOW):
+            with self.subTest(workflow=name):
+                for line in boot.reviewed_workflow(name).read_text().splitlines():
+                    stripped = line.strip()
+                    if stripped.startswith('uses:'):
+                        self.assertRegex(stripped.split('@', 1)[1], r'^[0-9a-f]{40}
+    unittest.main()
+,
+                                         f'{name} must pin third-party actions to immutable commit SHAs')
+
+
 if __name__ == '__main__':
     unittest.main()
