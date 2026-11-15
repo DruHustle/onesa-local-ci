@@ -533,7 +533,13 @@
       "decision": "NO-GO",
       "owner": "pasofi-network",
       "evidence": [],
-      "blocker": "Live captive portal, paid entitlement, RADIUS, router quota and off-site recovery not verified"
+      "blocker": "Live captive portal, paid entitlement, RADIUS, router quota and off-site recovery not verified",
+      "candidate": "",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested at site/provider/hardware",
+      "support_owner": "pasofi-network",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "pasofi",
@@ -542,7 +548,13 @@
       "decision": "NO-GO",
       "owner": "pasofi-network",
       "evidence": [],
-      "blocker": "Live captive portal, paid entitlement, RADIUS, router quota and off-site recovery not verified"
+      "blocker": "Live captive portal, paid entitlement, RADIUS, router quota and off-site recovery not verified",
+      "candidate": "",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested at site/provider/hardware",
+      "support_owner": "pasofi-network",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "pasofi",
@@ -551,7 +563,13 @@
       "decision": "NO-GO",
       "owner": "pasofi-network",
       "evidence": [],
-      "blocker": "Live captive portal, paid entitlement, RADIUS, router quota and off-site recovery not verified"
+      "blocker": "Live captive portal, paid entitlement, RADIUS, router quota and off-site recovery not verified",
+      "candidate": "",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested at site/provider/hardware",
+      "support_owner": "pasofi-network",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "pasofi",
@@ -560,7 +578,13 @@
       "decision": "NO-GO",
       "owner": "pasofi-network",
       "evidence": [],
-      "blocker": "Live captive portal, paid entitlement, RADIUS, router quota and off-site recovery not verified"
+      "blocker": "Live captive portal, paid entitlement, RADIUS, router quota and off-site recovery not verified",
+      "candidate": "",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested at site/provider/hardware",
+      "support_owner": "pasofi-network",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "pasofi",
@@ -569,7 +593,13 @@
       "decision": "NO-GO",
       "owner": "pasofi-payments",
       "evidence": [],
-      "blocker": "Live merchant capture, exactly-once entitlement and receipt not verified"
+      "blocker": "Live merchant capture, exactly-once entitlement and receipt not verified",
+      "candidate": "",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested at site/provider/hardware",
+      "support_owner": "pasofi-payments",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "pasofi",
@@ -578,7 +608,13 @@
       "decision": "NO-GO",
       "owner": "pasofi-payments",
       "evidence": [],
-      "blocker": "Live merchant capture, exactly-once entitlement and receipt not verified"
+      "blocker": "Live merchant capture, exactly-once entitlement and receipt not verified",
+      "candidate": "",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested at site/provider/hardware",
+      "support_owner": "pasofi-payments",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "pasofi",
@@ -587,7 +623,13 @@
       "decision": "NO-GO",
       "owner": "pasofi-payments",
       "evidence": [],
-      "blocker": "Live merchant capture, exactly-once entitlement and receipt not verified"
+      "blocker": "Live merchant capture, exactly-once entitlement and receipt not verified",
+      "candidate": "",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested at site/provider/hardware",
+      "support_owner": "pasofi-payments",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "onesa-drone",
@@ -596,7 +638,13 @@
       "decision": "NO-GO",
       "owner": "drone-hardware",
       "evidence": [],
-      "blocker": "Physical hardware interface, operator acceptance and loss-of-link recovery not verified"
+      "blocker": "Physical hardware interface, operator acceptance and loss-of-link recovery not verified",
+      "candidate": "",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested at site/provider/hardware",
+      "support_owner": "drone-hardware",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "onesa-robot",
@@ -605,7 +653,13 @@
       "decision": "NO-GO",
       "owner": "robot-hardware",
       "evidence": [],
-      "blocker": "Actual controller, interlocks, stop and task acceptance not verified"
+      "blocker": "Actual controller, interlocks, stop and task acceptance not verified",
+      "candidate": "",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested at site/provider/hardware",
+      "support_owner": "robot-hardware",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "smart-farmer",
@@ -614,7 +668,13 @@
       "decision": "NO-GO",
       "owner": "smart-farmer-operations",
       "evidence": [],
-      "blocker": "Real site end-to-end workflow, persisted outcome and permissions unverified"
+      "blocker": "Real site end-to-end workflow, persisted outcome and permissions unverified",
+      "candidate": "",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested at site/provider/hardware",
+      "support_owner": "smart-farmer-operations",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "smart-logistics",
@@ -623,7 +683,13 @@
       "decision": "NO-GO",
       "owner": "smart-logistics-operations",
       "evidence": [],
-      "blocker": "Real site end-to-end workflow, persisted outcome and permissions unverified"
+      "blocker": "Real site end-to-end workflow, persisted outcome and permissions unverified",
+      "candidate": "",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested at site/provider/hardware",
+      "support_owner": "smart-logistics-operations",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "smart-factory",
@@ -632,7 +698,13 @@
       "decision": "NO-GO",
       "owner": "smart-factory-operations",
       "evidence": [],
-      "blocker": "Real site end-to-end workflow, persisted outcome and permissions unverified"
+      "blocker": "Real site end-to-end workflow, persisted outcome and permissions unverified",
+      "candidate": "",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested at site/provider/hardware",
+      "support_owner": "smart-factory-operations",
+      "operating_limits": "Not qualified"
     },
     {
       "product": "onesa-mobile",
@@ -641,7 +713,13 @@
       "decision": "NO-GO",
       "owner": "mobile-provider",
       "evidence": [],
-      "blocker": "Partner specification, sandbox, duplicate callback and handset acceptance unverified"
+      "blocker": "Partner specification, sandbox, duplicate callback and handset acceptance unverified",
+      "candidate": "",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested at site/provider/hardware",
+      "support_owner": "mobile-provider",
+      "operating_limits": "Not qualified"
     }
   ]
 }
