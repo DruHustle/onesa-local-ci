@@ -289,16 +289,18 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [
-        "https://github.com/DruHustle/smart-logistics/pull/29"
+        "https://github.com/DruHustle/smart-logistics/pull/29",
+        "https://github.com/DruHustle/smart-logistics/actions/runs/43653291327"
       ],
-      "blocker": "Native source exists; signed installed build, device workflow and store receipt unverified",
+      "blocker": "CI artifact exists; signed distribution, on-device production workflow and store receipt unverified",
       "environment": "device (unverified)",
       "role_tested": "",
-      "observed_result": "Native client source exists at smart-logistics-frontend/mobile; signed install and customer workflow not verified",
+      "observed_result": "CI native build passed and artifact retained; physical installation, production workflow and store acceptance unverified",
       "support_owner": "operations",
       "operating_limits": "Not qualified",
       "store_submission": "not-submitted",
-      "store_receipt": null
+      "store_receipt": null,
+      "build_identifier": "SmartLogistics-iPhone-simulator"
     },
     {
       "product": "smart-logistics",
@@ -309,16 +311,18 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [
-        "https://github.com/DruHustle/smart-logistics/pull/29"
+        "https://github.com/DruHustle/smart-logistics/pull/29",
+        "https://github.com/DruHustle/smart-logistics/actions/runs/43653291327"
       ],
-      "blocker": "Native source exists; signed installed build, device workflow and store receipt unverified",
+      "blocker": "CI artifact exists; signed distribution, on-device production workflow and store receipt unverified",
       "environment": "device (unverified)",
       "role_tested": "",
-      "observed_result": "Native client source exists at smart-logistics-frontend/mobile; signed install and customer workflow not verified",
+      "observed_result": "CI native build passed and artifact retained; physical installation, production workflow and store acceptance unverified",
       "support_owner": "operations",
       "operating_limits": "Not qualified",
       "store_submission": "not-submitted",
-      "store_receipt": null
+      "store_receipt": null,
+      "build_identifier": "SmartLogistics-qualification-apk"
     },
     {
       "product": "smart-factory",
@@ -347,16 +351,18 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [
-        "https://github.com/DruHustle/smart-factory/pull/28"
+        "https://github.com/DruHustle/smart-factory/pull/28",
+        "https://github.com/DruHustle/smart-factory/actions/runs/43649530151"
       ],
-      "blocker": "Native source exists; signed installed build, device workflow and store receipt unverified",
+      "blocker": "CI artifact exists; signed distribution, on-device production workflow and store receipt unverified",
       "environment": "device (unverified)",
       "role_tested": "",
-      "observed_result": "Native client source exists at smart-factory-frontend/mobile; signed install and customer workflow not verified",
+      "observed_result": "CI native build passed and artifact retained; physical installation, production workflow and store acceptance unverified",
       "support_owner": "operations",
       "operating_limits": "Not qualified",
       "store_submission": "not-submitted",
-      "store_receipt": null
+      "store_receipt": null,
+      "build_identifier": "SmartFactory-iPhone-simulator"
     },
     {
       "product": "smart-factory",
@@ -367,16 +373,18 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [
-        "https://github.com/DruHustle/smart-factory/pull/28"
+        "https://github.com/DruHustle/smart-factory/pull/28",
+        "https://github.com/DruHustle/smart-factory/actions/runs/43649530151"
       ],
-      "blocker": "Native source exists; signed installed build, device workflow and store receipt unverified",
+      "blocker": "CI artifact exists; signed distribution, on-device production workflow and store receipt unverified",
       "environment": "device (unverified)",
       "role_tested": "",
-      "observed_result": "Native client source exists at smart-factory-frontend/mobile; signed install and customer workflow not verified",
+      "observed_result": "CI native build passed and artifact retained; physical installation, production workflow and store acceptance unverified",
       "support_owner": "operations",
       "operating_limits": "Not qualified",
       "store_submission": "not-submitted",
-      "store_receipt": null
+      "store_receipt": null,
+      "build_identifier": "SmartFactory-qualification-apk"
     },
     {
       "product": "onesa-ai-platform",
@@ -405,16 +413,18 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [
-        "https://github.com/DruHustle/onesa-ai-platform/pull/323"
+        "https://github.com/DruHustle/onesa-ai-platform/pull/323",
+        "https://github.com/DruHustle/onesa-ai-platform/actions/runs/43650447410"
       ],
-      "blocker": "Native source exists; signed installed build, device workflow and store receipt unverified",
+      "blocker": "CI artifact exists; signed distribution, on-device production workflow and store receipt unverified",
       "environment": "device (unverified)",
       "role_tested": "",
-      "observed_result": "Native client source exists at onesa-ai-platform-frontend/mobile; signed install and customer workflow not verified",
+      "observed_result": "CI native build passed and artifact retained; physical installation, production workflow and store acceptance unverified",
       "support_owner": "ai",
       "operating_limits": "Not qualified",
       "store_submission": "not-submitted",
-      "store_receipt": null
+      "store_receipt": null,
+      "build_identifier": "onesa-ai-platform-ios-f7a2cc226a676923eaddbb937661f3e59d0cbcda"
     },
     {
       "product": "onesa-ai-platform",
@@ -425,16 +435,18 @@
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
       "evidence": [
-        "https://github.com/DruHustle/onesa-ai-platform/pull/323"
+        "https://github.com/DruHustle/onesa-ai-platform/pull/323",
+        "https://github.com/DruHustle/onesa-ai-platform/actions/runs/43650447410"
       ],
-      "blocker": "Native source exists; signed installed build, device workflow and store receipt unverified",
+      "blocker": "CI artifact exists; signed distribution, on-device production workflow and store receipt unverified",
       "environment": "device (unverified)",
       "role_tested": "",
-      "observed_result": "Native client source exists at onesa-ai-platform-frontend/mobile; signed install and customer workflow not verified",
+      "observed_result": "CI native build passed and artifact retained; physical installation, production workflow and store acceptance unverified",
       "support_owner": "ai",
       "operating_limits": "Not qualified",
       "store_submission": "not-submitted",
-      "store_receipt": null
+      "store_receipt": null,
+      "build_identifier": "onesa-ai-platform-android-f7a2cc226a676923eaddbb937661f3e59d0cbcda"
     },
     {
       "product": "company-portal",
