@@ -110,7 +110,12 @@ class PortfolioGateTests(unittest.TestCase):
     def test_unverified_environment_or_unobserved_results_cannot_pass(self):
         for group in ("entries", "scope_gates"):
             for field, value in (("environment", " "), ("environment", "production (unverified)"),
-                                 ("operating_limits", ""), ("observed_result", "Not tested at site/provider/hardware"),
+                                 ("environment", "production (unverified) with an assumed pass"),
+                                 ("operating_limits", ""), ("operating_limits", "Not qualified for production"),
+                                 ("operating_limits", "Pending qualification"),
+                                 ("observed_result", "Not tested at site/provider/hardware"),
+                                 ("observed_result", "Not tested on the release candidate; assumed complete"),
+                                 ("observed_result", "Pending acceptance"),
                                  ("evidence", ["https://"])):
                 with self.subTest(group=group, field=field):
                     doc = copy.deepcopy(self.document)

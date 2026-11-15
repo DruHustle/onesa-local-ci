@@ -35,12 +35,29 @@ def valid_evidence(link):
         return False
 
 
+UNVERIFIED_MARKERS = (
+    "unverified", "not tested", "not run", "not observed", "not verified",
+    "pending", "unknown", "no evidence",
+)
+UNQUALIFIED_LIMIT_MARKERS = (
+    "not qualified", "unqualified", "unknown", "pending", "unverified",
+    "not established", "not tested",
+)
+
+
 def has_observation(row):
     environment = row.get("environment")
     outcome = row.get("observed_result")
-    return (nonblank(environment) and not environment.strip().casefold().endswith("(unverified)")
-            and nonblank(outcome) and outcome.strip().casefold() not in
-            ("not tested on the release candidate", "not tested at site/provider/hardware"))
+    if not nonblank(environment) or not nonblank(outcome):
+        return False
+    evidence_text = f"{environment} {outcome}".casefold()
+    return not any(marker in evidence_text for marker in UNVERIFIED_MARKERS)
+
+
+def has_qualified_limits(row):
+    limits = row.get("operating_limits")
+    return (nonblank(limits) and
+            not any(marker in limits.strip().casefold() for marker in UNQUALIFIED_LIMIT_MARKERS))
 
 
 def validate(document, require_go=False):
@@ -93,11 +110,8 @@ def validate(document, require_go=False):
                 "owner", "workflow", "environment", "role_tested", "observed_result"
             )) or not has_observation(row):
                 errors.append(f"{key}: GO requires an observed role-specific workflow")
-            if not nonblank(row.get("support_owner")) or not nonblank(row.get("operating_limits")) or (
-                isinstance(row.get("operating_limits"), str) and
-                row["operating_limits"].strip().casefold() == "not qualified"
-            ):
-                errors.append(f"{key}: GO requires support ownership and operating limits")
+            if not nonblank(row.get("support_owner")) or not has_qualified_limits(row):
+                errors.append(f"{key}: GO requires support ownership and qualified operating limits")
             if row["platform"] in ("ios", "android") and (
                 row.get("store_submission") != "accepted" or not nonblank(row.get("store_receipt"))
             ):
@@ -155,12 +169,9 @@ def validate(document, require_go=False):
                 errors.append(f"{key}: GO requires scope acceptance evidence")
             if not all(nonblank(row.get(field)) for field in (
                 "owner", "candidate", "environment", "role_tested", "observed_result",
-                "support_owner", "operating_limits"
-            )) or (
-                isinstance(row.get("operating_limits"), str)
-                and row["operating_limits"].strip().casefold() == "not qualified"
-            ) or not has_observation(row):
-                errors.append(f"{key}: GO requires scoped candidate, observed result, operator and limits")
+                "support_owner"
+            )) or not has_qualified_limits(row) or not has_observation(row):
+                errors.append(f"{key}: GO requires scoped candidate, observed result, operator and qualified limits")
             if not isinstance(row.get("blocker"), str) or row["blocker"].strip():
                 errors.append(f"{key}: GO cannot retain scope blocker")
         elif require_go:
