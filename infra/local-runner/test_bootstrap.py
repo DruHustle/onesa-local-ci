@@ -189,7 +189,7 @@ systemctl() {
                     self.assertEqual((work / 'runsvc.sh').read_bytes(), vendor_wrapper.read_bytes())
                     self.assertEqual((work / 'runsvc.sh').stat().st_mode & 0o777, 0o755)
                     for directive in ['WorkingDirectory=/opt/onesa-actions-runner',
-                                      'ExecStart=/opt/onesa-actions-runner/runsvc.sh', 'KillMode=process',
+                                      'ExecStart=/opt/onesa-actions-runner/runsvc.sh', 'KillMode=mixed',
                                       'KillSignal=SIGTERM', 'TimeoutStopSec=5min']:
                         self.assertIn(directive, unit.read_text().splitlines())
 
@@ -258,6 +258,11 @@ systemctl() {
         self.assertIn('".github/workflows/**"', workflow)
         self.assertIn("-p 'test_*.py' -v", workflow)
         self.assertIn("python -m unittest discover -s infra/local-runner", workflow)
+
+    def test_service_uses_mixed_kill_mode_to_reap_orphaned_job_processes(self):
+        setup = (HERE / "guest.sh").read_text()
+        self.assertIn("KillMode=mixed", setup)
+        self.assertNotIn("KillMode=process", setup)
 
     def test_service_setup_shell_and_workflow_contract(self):
         subprocess.run(['bash', '-n', str(HERE / 'guest.sh')], check=True)
