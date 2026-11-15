@@ -26,9 +26,16 @@ def eligible(artifact, now, days, repo_id):
     # Repository IDs alone do not identify the source revision. Require the
     # full workflow head SHA and branch before treating an artifact as bound
     # to an auditable source run.
-    if not isinstance(provenance.get("head_sha"), str) or not re.fullmatch(
+    branch = provenance.get("head_branch")
+    if (not isinstance(provenance.get("head_sha"), str) or not re.fullmatch(
         r"[0-9a-f]{40}", provenance["head_sha"]
-    ) or not isinstance(provenance.get("head_branch"), str) or not provenance["head_branch"].strip():
+    ) or not isinstance(branch, str) or not branch or branch != branch.strip()):
+        return False
+    # Never clean artifacts originating from protected/release branches,
+    # even when their names happen to use a disposable prefix.
+    protected_branch = branch.casefold()
+    if (protected_branch in {"main", "master"}
+            or protected_branch.startswith(("release/", "production/", "hotfix/"))):
         return False
     size = artifact.get("size_in_bytes")
     if type(size) is not int or size < 0:

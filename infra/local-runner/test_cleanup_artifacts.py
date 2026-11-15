@@ -19,7 +19,7 @@ class ArtifactCleanupTests(unittest.TestCase):
                 "expired": expired, "size_in_bytes": 500,
                 "workflow_run": {"id": 456, "repository_id": self.repo_id,
                                  "head_repository_id": self.repo_id,
-                                 "head_sha": "a" * 40, "head_branch": "main"}}
+                                 "head_sha": "a" * 40, "head_branch": "feature/ci-cleanup-test"}}
 
     def test_old_disposable_artifact_is_eligible(self):
         self.assertTrue(cleanup.eligible(
@@ -142,6 +142,16 @@ class ArtifactCleanupTests(unittest.TestCase):
             artifact = dict(valid, workflow_run=provenance)
             with self.subTest(head_branch=bad_branch):
                 self.assertFalse(cleanup.eligible(artifact, self.now, 14, self.repo_id))
+
+    def test_protected_and_release_branch_artifacts_are_never_eligible(self):
+        valid = self.item("ci-old", "2026-09-01T00:00:00Z")
+        for branch in ("main", "master", "release/portfolio-gates-20261115",
+                       "production", "production/hotfix", "hotfix/urgent"):
+            artifact = dict(valid, workflow_run=dict(valid["workflow_run"], head_branch=branch))
+            with self.subTest(branch=branch):
+                self.assertFalse(cleanup.eligible(artifact, self.now, 14, self.repo_id))
+        malformed = dict(valid, workflow_run=dict(valid["workflow_run"], head_branch=" main "))
+        self.assertFalse(cleanup.eligible(malformed, self.now, 14, self.repo_id))
 
     def test_unprintable_artifact_names_are_not_eligible(self):
         for name in ("ci-old\nDELETE 9", "preview-\x1b[31m", "test-\u2028other"):
