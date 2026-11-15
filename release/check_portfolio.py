@@ -3,6 +3,7 @@
 import argparse
 import json
 from pathlib import Path
+import re
 from urllib.parse import urlsplit
 
 PRODUCTS = (
@@ -12,6 +13,21 @@ PRODUCTS = (
 WEB_ONLY = ("company-portal", "documents-public", "documents-internal", "identity")
 EXPECTED = {(p, c) for p in PRODUCTS for c in ("web", "ios", "android")}
 EXPECTED |= {(p, "web") for p in WEB_ONLY}
+
+SOURCE_REPOSITORIES = {
+    "onesa-mobile": "onesa-mobile",
+    "pasofi": "pasofi",
+    "onesa-drone": "onesa-drone",
+    "onesa-robot": "onesa-robot",
+    "smart-farmer": "smart-farmer",
+    "smart-logistics": "smart-logistics",
+    "smart-factory": "smart-factory",
+    "onesa-ai-platform": "onesa-ai-platform",
+    "company-portal": "onesa-company-portal",
+    "documents-public": "onesa-documents",
+    "documents-internal": "onesa-documents",
+    "identity": "onesa-identity",
+}
 
 
 def nonblank(value):
@@ -46,12 +62,37 @@ UNQUALIFIED_LIMIT_MARKERS = (
 
 
 def has_observation(row):
-    environment = row.get("environment")
-    outcome = row.get("observed_result")
-    if not nonblank(environment) or not nonblank(outcome):
+    # A GO must identify the workflow, tested role, environment and observed
+    # outcome. A nonblank phrase such as "not tested" is not acceptance.
+    fields = ("workflow", "environment", "role_tested", "observed_result")
+    values = [row.get(field) for field in fields if field in row]
+    if not all(nonblank(value) for value in values) or len(values) < 3:
         return False
-    evidence_text = f"{environment} {outcome}".casefold()
+    evidence_text = " ".join(values).casefold()
     return not any(marker in evidence_text for marker in UNVERIFIED_MARKERS)
+
+
+def has_source_bound_evidence(product, candidate, evidence):
+    # A generic HTTPS URL or PR link does not bind acceptance to the exact
+    # candidate. Require the product's own repository commit URL and a
+    # workflow-run URL in that repository for the same full commit SHA.
+    repository = SOURCE_REPOSITORIES.get(product)
+    if not repository or not isinstance(candidate, str) or not re.fullmatch(r"[0-9a-f]{40}", candidate):
+        return False
+    if not isinstance(evidence, list):
+        return False
+    prefix = f"/DruHustle/{repository}"
+    has_commit = False
+    has_run = False
+    for link in evidence:
+        if not valid_evidence(link):
+            continue
+        parsed = urlsplit(link)
+        if parsed.hostname != "github.com" or parsed.port not in (None, 443) or parsed.query or parsed.fragment:
+            continue
+        has_commit |= parsed.path == f"{prefix}/commit/{candidate}"
+        has_run |= re.fullmatch(re.escape(prefix) + r"/actions/runs/[0-9]+(?:/attempts/[0-9]+)?", parsed.path) is not None
+    return has_commit and has_run
 
 
 def has_qualified_limits(row):
@@ -112,6 +153,8 @@ def validate(document, require_go=False):
                 valid_evidence(link) for link in row["evidence"]
             ):
                 errors.append(f"{key}: GO requires linked acceptance evidence")
+            if not has_source_bound_evidence(row["product"], row.get("candidate"), row.get("evidence")):
+                errors.append(f"{key}: GO requires exact candidate commit and workflow-run evidence in its source repository")
             if not all(nonblank(row.get(field)) for field in (
                 "owner", "workflow", "environment", "role_tested", "observed_result"
             )) or not has_observation(row):
@@ -180,6 +223,8 @@ def validate(document, require_go=False):
                 valid_evidence(link) for link in evidence
             ):
                 errors.append(f"{key}: GO requires scope acceptance evidence")
+            if not has_source_bound_evidence(row["product"], row.get("candidate"), evidence):
+                errors.append(f"{key}: GO requires exact candidate commit and workflow-run evidence in its source repository")
             if not all(nonblank(row.get(field)) for field in (
                 "owner", "candidate", "environment", "role_tested", "observed_result",
                 "support_owner"
