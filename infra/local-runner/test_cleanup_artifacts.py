@@ -155,6 +155,28 @@ class ArtifactCleanupTests(unittest.TestCase):
                     cleanup.main()
         self.assertFalse(any(call[:3] == ("api", "-X", "DELETE") for call in calls))
 
+    def test_duplicate_id_with_ineligible_copy_aborts_before_any_delete(self):
+        import json
+        from unittest.mock import patch
+        valid = self.item("ci-old", "2026-09-01T00:00:00Z")
+        malformed_duplicate = dict(valid, created_at="not-a-timestamp")
+        calls = []
+
+        def fake_gh(*args):
+            calls.append(args)
+            if args == ("api", "repos/DruHustle/onesa-local-ci"):
+                return json.dumps({"full_name": "DruHustle/onesa-local-ci", "id": self.repo_id})
+            if args[:2] == ("api", "--paginate"):
+                return "\\n".join(json.dumps(item) for item in (valid, malformed_duplicate))
+            raise AssertionError(args)
+
+        with patch.object(cleanup, "gh", side_effect=fake_gh):
+            with patch("sys.argv", ["cleanup", "--apply", "--confirm-repo",
+                                    "DruHustle/onesa-local-ci", "--confirm-id", "123"]):
+                with self.assertRaises(SystemExit):
+                    cleanup.main()
+        self.assertFalse(any(call[:3] == ("api", "-X", "DELETE") for call in calls))
+
     def test_expired_artifacts_not_redeleted(self):
         self.assertFalse(cleanup.eligible(
             self.item("ci-old", "2026-09-01T00:00:00Z", True),
