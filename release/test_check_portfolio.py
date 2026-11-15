@@ -384,7 +384,7 @@ class PortfolioGateTests(unittest.TestCase):
             "status": "completed", "conclusion": "success", "event": "push",
             "head_repository": {"full_name": "DruHustle/onesa-mobile"},
             "repository": {"full_name": "DruHustle/onesa-mobile"},
-            "workflow_id": 7, "path": ".github/workflows/verify.yml",
+            "workflow_id": 7, "path": ".github/workflows/verify.yml@refs/heads/main",
             "run_attempt": 1,
         }
         errors = verify_source_runs(self.document, lambda _repo, _run_id: valid, self.successful_jobs)
@@ -392,7 +392,7 @@ class PortfolioGateTests(unittest.TestCase):
                             for error in errors), errors)
         evidence[-1] = "https://github.com/DruHustle/onesa-mobile/actions/runs/123/attempts/1"
         row["evidence"] = evidence
-        self.assertEqual(verify_source_runs(self.document, lambda _repo, _run_id: valid), [])
+        self.assertEqual(verify_source_runs(self.document, lambda _repo, _run_id: valid, self.successful_jobs), [])
 
     def test_every_cited_source_run_is_checked_not_just_one_matching_run(self):
         row = self.document["entries"][0]
@@ -413,7 +413,7 @@ class PortfolioGateTests(unittest.TestCase):
         def fetch(repository, run_id):
             calls.append(run_id)
             return dict(good, id=run_id, head_sha=("a" * 40 if run_id == 456 else candidate))
-        errors = verify_source_runs(self.document, fetch)
+        errors = verify_source_runs(self.document, fetch, self.successful_jobs)
         self.assertEqual(calls, [123, 456])
         self.assertTrue(any("workflow run 456" in error for error in errors), errors)
 
