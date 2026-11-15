@@ -22,10 +22,9 @@ class RunnerTest(unittest.TestCase):
     def metadata(self):
         return {'': {'full_name': boot.REPO, 'private': True, 'default_branch': 'main', 'permissions': {'admin': True}},
                 'collaborators?per_page=100': [{'login': 'DruHustle'}],
-                'contents/.github/workflows?ref=main': [{'name': name} for name in reversed(boot.REVIEWED_WORKFLOWS)],
-                **{f'contents/.github/workflows/{name}?ref=main': {
-                    'content': base64.b64encode(boot.reviewed_workflow(name).read_bytes()).decode()}
-                    for name in boot.REVIEWED_WORKFLOWS}}
+                'contents/.github/workflows?ref=main': [{'name': boot.WORKFLOW}],
+                f'contents/.github/workflows/{boot.WORKFLOW}?ref=main': {
+                    'content': base64.b64encode(boot.reviewed_workflow().read_bytes()).decode()}}
 
     def test_only_expected_private_controller_can_register(self):
         for field, value in [('private', False), ('full_name', 'DruHustle/onesa-company-portal'), ('default_branch', 'dev')]:
@@ -38,7 +37,6 @@ class RunnerTest(unittest.TestCase):
     def test_dirty_controller_aborts_and_exact_workflow_passes(self):
         for name, value in [('collaborators?per_page=100', [{'login': 'DruHustle'}, {'login': 'another'}]),
                             ('contents/.github/workflows?ref=main', [{'name': 'another.yml'}]),
-                            ('contents/.github/workflows/portfolio-gates.yml?ref=main', {'content': 'YQ=='}),
                             (f'contents/.github/workflows/{boot.WORKFLOW}?ref=main', {'content': 'YQ=='})]:
             with self.subTest(name=name):
                 values = self.metadata()
@@ -46,6 +44,27 @@ class RunnerTest(unittest.TestCase):
                 with patch.object(boot, 'api', side_effect=values.__getitem__), self.assertRaises(ValueError):
                     boot.controller()
         with patch.object(boot, 'api', side_effect=self.metadata().__getitem__):
+            boot.controller()
+
+    def test_optional_release_gate_cannot_break_or_bypass_workflow_integrity(self):
+        values = self.metadata()
+        workflow = 'portfolio-gates.yml'
+        values['contents/.github/workflows?ref=main'] = [
+            {'name': workflow}, {'name': boot.WORKFLOW}
+        ]
+        key = f'contents/.github/workflows/{workflow}?ref=main'
+        values[key] = {'content': base64.b64encode(
+            boot.reviewed_workflow(workflow).read_bytes()).decode()}
+        # Ordering should not matter, and both checked-out bytes must match.
+        with patch.object(boot, 'api', side_effect=values.__getitem__):
+            boot.controller()
+        # Having a file of an allowed name is not enough: modified content is rejected.
+        values[key] = {'content': base64.b64encode(b'unreviewed: true').decode()}
+        with patch.object(boot, 'api', side_effect=values.__getitem__), self.assertRaises(ValueError):
+            boot.controller()
+        # Never accept unexpected workflows, even if the two reviewed files match.
+        values['contents/.github/workflows?ref=main'].append({'name': 'untrusted.yml'})
+        with patch.object(boot, 'api', side_effect=values.__getitem__), self.assertRaises(ValueError):
             boot.controller()
 
     def test_owner_without_separate_collaborator_entry_can_configure(self):
@@ -207,6 +226,12 @@ systemctl() {
                     boot.stage_guest_setup()
                 self.assertEqual(target.read_bytes(), source)
                 self.assertEqual(target.stat().st_mode & 0o777, 0o700)
+
+    def test_release_gate_validates_all_maintained_runner_modules(self):
+        workflow = boot.reviewed_workflow('portfolio-gates.yml').read_text()
+        self.assertIn('"infra/local-runner/**"', workflow)
+        self.assertIn("-p 'test_*.py' -v", workflow)
+        self.assertIn("python -m unittest discover -s infra/local-runner", workflow)
 
     def test_service_setup_shell_and_workflow_contract(self):
         subprocess.run(['bash', '-n', str(HERE / 'guest.sh')], check=True)

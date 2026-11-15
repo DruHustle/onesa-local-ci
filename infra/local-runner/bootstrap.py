@@ -17,7 +17,9 @@ REPO = 'DruHustle/onesa-local-ci'
 VM = 'onesa-portal-local-arm64'
 LABEL = 'onesa-portal-local'
 WORKFLOW = 'trusted-portal.yml'
-REVIEWED_WORKFLOWS = (WORKFLOW, 'portfolio-gates.yml')
+# The release gate is a separate, reviewed, GitHub-hosted workflow. Adding it
+# must not prevent verification/resumption of the trusted local runner.
+ALLOWED_WORKFLOWS = frozenset({WORKFLOW, 'portfolio-gates.yml'})
 
 
 def run(*args, data=None, capture=False):
@@ -36,6 +38,7 @@ def require(condition, message):
 
 
 def reviewed_workflow(name=WORKFLOW):
+    require(name in ALLOWED_WORKFLOWS, 'Unexpected workflow name.')
     return HERE.parents[1] / '.github/workflows' / name
 
 
@@ -48,12 +51,19 @@ def controller():
     require({item['login'] for item in collaborators} <= {REPO.split('/')[0]},
             'Dedicated controller requires owner-only access.')
     entries = api('contents/.github/workflows?ref=main')
-    require(sorted(entry['name'] for entry in entries) == sorted(REVIEWED_WORKFLOWS),
+    require(isinstance(entries, list) and all(isinstance(entry, dict) for entry in entries),
+            'Unexpected private controller workflow listing.')
+    names = [entry.get('name') for entry in entries]
+    require(len(names) == len(set(names)) and WORKFLOW in names
+            and set(names) <= ALLOWED_WORKFLOWS,
             'Unexpected private controller workflows.')
-    for name in REVIEWED_WORKFLOWS:
+    # Check *every* active workflow against this same checkout. Otherwise an
+    # added release-gate workflow either blocks local runner resumption or can
+    # escape the original single-file integrity check.
+    for name in sorted(names):
         content = api(f'contents/.github/workflows/{name}?ref=main')
         require(base64.b64decode(content['content']) == reviewed_workflow(name).read_bytes(),
-                f'The active {name} workflow differs from this reviewed bootstrap.')
+                f'The active {name} workflow differs from this reviewed checkout.')
 
 
 def instances():
