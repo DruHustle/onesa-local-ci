@@ -95,11 +95,11 @@ class ArtifactCleanupTests(unittest.TestCase):
                     "--confirm-repo", "DruHustle/onesa-company-portal"]
             if apply:
                 args.extend(["--apply", "--confirm-id", "123"])
-            with self.subTest(apply=apply), patch("sys.argv", args), \\
-                 patch.object(cleanup, "gh") as gh:
-                with self.assertRaises(SystemExit):
-                    cleanup.main()
-                gh.assert_not_called()
+            with self.subTest(apply=apply):
+                with patch("sys.argv", args), patch.object(cleanup, "gh") as gh:
+                    with self.assertRaises(SystemExit):
+                        cleanup.main()
+                    gh.assert_not_called()
 
     def test_apply_refuses_deletion_without_explicit_artifact_ids(self):
         from unittest.mock import patch
