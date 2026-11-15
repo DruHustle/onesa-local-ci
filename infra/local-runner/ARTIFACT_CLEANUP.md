@@ -17,3 +17,16 @@ python3 infra/local-runner/cleanup_artifacts.py \
 ```
 
 The utility is hard-scoped to `DruHustle/onesa-local-ci`; `--repo` cannot redirect it to another repository. The ID above is illustrative. The script refuses unconfirmed, duplicate, missing or newly ineligible IDs before making any DELETE request. Approval does not permit deletion of unrelated artifacts in the same repository. Run only from the owner's trusted workstation; GitHub CLI credentials must remain local. Record the dry-run review and any approved deletions in the release evidence ledger. Never assume these operations establish deployment or product launch readiness.
+
+## Source workflow approval
+
+The cleanup utility also requires the artifact's originating workflow ID to be in
+`DISPOSABLE_WORKFLOW_IDS`, and the source run must be completed successfully from
+a `push` or `workflow_dispatch` event. That allowlist is intentionally empty until
+an owner reviews a workflow that actually produces disposable artifacts in this
+controller repository. Consequently, the current production utility will report no
+eligible artifacts and will refuse every deletion, even when a record otherwise
+looks old and disposable. Do not add a workflow ID merely to make cleanup work;
+first verify its workflow path, purpose, artifact naming contract and evidence
+retention requirements.
+
