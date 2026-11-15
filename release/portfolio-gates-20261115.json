@@ -512,5 +512,124 @@
       "support_owner": "identity",
       "operating_limits": "Not qualified"
     }
+  ],
+  "scope_gates": [
+    {
+      "product": "pasofi",
+      "kind": "wifi-site",
+      "scope": "K1",
+      "decision": "NO-GO",
+      "owner": "pasofi-network",
+      "evidence": [],
+      "blocker": "Live captive portal, paid entitlement, RADIUS, router quota and off-site recovery not verified"
+    },
+    {
+      "product": "pasofi",
+      "kind": "wifi-site",
+      "scope": "G1",
+      "decision": "NO-GO",
+      "owner": "pasofi-network",
+      "evidence": [],
+      "blocker": "Live captive portal, paid entitlement, RADIUS, router quota and off-site recovery not verified"
+    },
+    {
+      "product": "pasofi",
+      "kind": "wifi-site",
+      "scope": "G2",
+      "decision": "NO-GO",
+      "owner": "pasofi-network",
+      "evidence": [],
+      "blocker": "Live captive portal, paid entitlement, RADIUS, router quota and off-site recovery not verified"
+    },
+    {
+      "product": "pasofi",
+      "kind": "wifi-site",
+      "scope": "G3",
+      "decision": "NO-GO",
+      "owner": "pasofi-network",
+      "evidence": [],
+      "blocker": "Live captive portal, paid entitlement, RADIUS, router quota and off-site recovery not verified"
+    },
+    {
+      "product": "pasofi",
+      "kind": "payment-channel",
+      "scope": "Stripe web card",
+      "decision": "NO-GO",
+      "owner": "pasofi-payments",
+      "evidence": [],
+      "blocker": "Live merchant capture, exactly-once entitlement and receipt not verified"
+    },
+    {
+      "product": "pasofi",
+      "kind": "payment-channel",
+      "scope": "Apple Pay iPhone",
+      "decision": "NO-GO",
+      "owner": "pasofi-payments",
+      "evidence": [],
+      "blocker": "Live merchant capture, exactly-once entitlement and receipt not verified"
+    },
+    {
+      "product": "pasofi",
+      "kind": "payment-channel",
+      "scope": "Google Pay Android",
+      "decision": "NO-GO",
+      "owner": "pasofi-payments",
+      "evidence": [],
+      "blocker": "Live merchant capture, exactly-once entitlement and receipt not verified"
+    },
+    {
+      "product": "onesa-drone",
+      "kind": "physical-task",
+      "scope": "Chubory A77 supervised inspection",
+      "decision": "NO-GO",
+      "owner": "drone-hardware",
+      "evidence": [],
+      "blocker": "Physical hardware interface, operator acceptance and loss-of-link recovery not verified"
+    },
+    {
+      "product": "onesa-robot",
+      "kind": "physical-task",
+      "scope": "supervised inspection on actual controller",
+      "decision": "NO-GO",
+      "owner": "robot-hardware",
+      "evidence": [],
+      "blocker": "Actual controller, interlocks, stop and task acceptance not verified"
+    },
+    {
+      "product": "smart-farmer",
+      "kind": "operational-pilot",
+      "scope": "customer site operational workflow",
+      "decision": "NO-GO",
+      "owner": "smart-farmer-operations",
+      "evidence": [],
+      "blocker": "Real site end-to-end workflow, persisted outcome and permissions unverified"
+    },
+    {
+      "product": "smart-logistics",
+      "kind": "operational-pilot",
+      "scope": "customer site operational workflow",
+      "decision": "NO-GO",
+      "owner": "smart-logistics-operations",
+      "evidence": [],
+      "blocker": "Real site end-to-end workflow, persisted outcome and permissions unverified"
+    },
+    {
+      "product": "smart-factory",
+      "kind": "operational-pilot",
+      "scope": "customer site operational workflow",
+      "decision": "NO-GO",
+      "owner": "smart-factory-operations",
+      "evidence": [],
+      "blocker": "Real site end-to-end workflow, persisted outcome and permissions unverified"
+    },
+    {
+      "product": "onesa-mobile",
+      "kind": "provider-integration",
+      "scope": "satellite-to-phone partner adapter",
+      "decision": "NO-GO",
+      "owner": "mobile-provider",
+      "evidence": [],
+      "blocker": "Partner specification, sandbox, duplicate callback and handset acceptance unverified"
+    }
   ]
 }
