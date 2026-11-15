@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - "release/**"
+      - "infra/local-runner/cleanup_artifacts.py"
+      - "infra/local-runner/test_cleanup_artifacts.py"
       - ".github/workflows/portfolio-gates.yml"
   push:
     branches: [main]
@@ -24,4 +26,5 @@ jobs:
         with:
           python-version: "3.11"
       - run: python -m unittest discover -s release -p 'test_*.py' -v
+      - run: python -m unittest discover -s infra/local-runner -p 'test_cleanup_artifacts.py' -v
       - run: python release/check_portfolio.py release/portfolio-gates-20261115.json
