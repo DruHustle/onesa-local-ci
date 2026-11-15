@@ -43,7 +43,7 @@ class RunnerTest(unittest.TestCase):
                 if command == ("rev-parse", "HEAD"):
                     return head.encode()
                 raise AssertionError(args)
-            with patch.object(boot, "run", side_effect=fake_run), \\
+            with patch.object(boot, "run", side_effect=fake_run), \
                  patch.object(boot, "api", return_value={"sha": remote_sha}):
                 return boot.trusted_checkout()
 
