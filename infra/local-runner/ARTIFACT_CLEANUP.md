@@ -6,7 +6,7 @@ Use this utility only when recovering storage capacity for an explicitly reviewe
 python3 infra/local-runner/cleanup_artifacts.py --repo DruHustle/onesa-local-ci --older-than-days 14
 ```
 
-The dry run lists only artifacts whose metadata is complete, whose originating workflow run and head repository match the repository's verified GitHub ID, whose source branch is not `main`, `master`, `release/*`, `production/*` or `hotfix/*`, whose names have a disposable test/preview prefix, and whose age is at least the configured retention period (minimum seven days). Old age or a disposable-looking name alone is **not** authorization to delete. Missing, malformed or ambiguous fields fail closed.
+The dry run lists only artifacts whose metadata is complete, whose originating workflow run and head repository match the repository's verified GitHub ID, whose source branch is not the repository's current default branch, `main`, `master`, `release/*`, `production/*` or `hotfix/*`, whose names have a disposable test/preview prefix, and whose age is at least the configured retention period (minimum seven days). Old age or a disposable-looking name alone is **not** authorization to delete. Missing, malformed or ambiguous fields fail closed.
 
 If and only if the owner reviews the output and explicitly approves particular IDs, re-run with both the exact repository confirmation and **one `--confirm-id` per artifact**:
 
