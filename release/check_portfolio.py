@@ -161,6 +161,8 @@ def validate(document, require_go=False):
             errors.append(f"{key}: release_url must be nonblank text or null")
         elif row["platform"] == "web" and release_url is not None and not valid_evidence(release_url):
             errors.append(f"{key}: web release_url must be a credential-free HTTPS URL")
+        elif isinstance(release_url, str) and release_url.startswith(("http://", "https://")) and not valid_evidence(release_url):
+            errors.append(f"{key}: URL release_url must be a credential-free HTTPS URL")
         if row.get("store_receipt") is not None and not isinstance(row.get("store_receipt"), str):
             errors.append(f"{key}: store_receipt must be text or null")
         for field in ("owner", "workflow", "environment", "observed_result",
