@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import re
 from urllib.parse import urlsplit
+from urllib.request import Request, urlopen
 
 PRODUCTS = (
     "onesa-mobile", "pasofi", "onesa-drone", "onesa-robot",
@@ -118,6 +119,102 @@ def has_source_bound_evidence(product, candidate, evidence):
         has_commit |= parsed.path == f"{prefix}/commit/{candidate}"
         has_run |= re.fullmatch(re.escape(prefix) + r"/actions/runs/[0-9]+(?:/attempts/[0-9]+)?", parsed.path) is not None
     return has_commit and has_run
+
+
+def source_run_references(product, evidence):
+    """Return every workflow-run ID cited for a GO row in its source repository."""
+    repository = SOURCE_REPOSITORIES.get(product)
+    if not repository or not isinstance(evidence, list):
+        return []
+    prefix = f"/DruHustle/{repository}/actions/runs/"
+    run_ids = []
+    for link in evidence:
+        if not valid_evidence(link):
+            continue
+        parsed = urlsplit(link)
+        if parsed.hostname != "github.com" or parsed.port not in (None, 443):
+            continue
+        match = re.fullmatch(re.escape(prefix) + r"([0-9]+)(?:/attempts/[0-9]+)?", parsed.path)
+        if match:
+            run_ids.append(int(match.group(1)))
+    return sorted(set(run_ids))
+
+
+def fetch_source_run(repository, run_id):
+    """Read public Actions metadata without credentials; inaccessible evidence fails closed."""
+    url = f"https://api.github.com/repos/DruHustle/{repository}/actions/runs/{run_id}"
+    request = Request(url, headers={
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "onesa-local-ci-release-evidence",
+    })
+    with urlopen(request, timeout=20) as response:
+        payload = json.load(response)
+    if not isinstance(payload, dict):
+        raise ValueError("GitHub returned a non-object workflow-run response")
+    return payload
+
+
+def verify_source_runs(document, fetch_json=fetch_source_run):
+    """Require every cited GO workflow run to prove the exact successful main candidate."""
+    if not isinstance(document, dict):
+        return ["source workflow evidence: release matrix must be an object"]
+    errors = []
+    cache = {}
+    for group in ("entries", "scope_gates"):
+        rows = document.get(group)
+        if not isinstance(rows, list):
+            continue
+        for index, row in enumerate(rows):
+            if not isinstance(row, dict) or row.get("decision") != "GO":
+                continue
+            product = row.get("product")
+            candidate = row.get("candidate")
+            if not isinstance(candidate, str) or not re.fullmatch(r"[0-9a-f]{40}", candidate):
+                continue  # Static validation reports the malformed candidate.
+            repository = SOURCE_REPOSITORIES.get(product)
+            run_ids = source_run_references(product, row.get("evidence"))
+            if not repository or not run_ids:
+                continue  # Static validation reports missing source-bound links.
+            for run_id in run_ids:
+                cache_key = (repository, run_id)
+                if cache_key not in cache:
+                    try:
+                        cache[cache_key] = fetch_json(repository, run_id)
+                    except Exception as exc:
+                        cache[cache_key] = exc
+                payload = cache[cache_key]
+                label = f"{group}[{index}] ({product}): workflow run {run_id}"
+                if isinstance(payload, Exception):
+                    errors.append(f"{label} could not be verified ({type(payload).__name__}); refusing GO")
+                    continue
+                if not isinstance(payload, dict):
+                    errors.append(f"{label} returned malformed metadata; refusing GO")
+                    continue
+                head_repository = payload.get("head_repository")
+                repository_data = payload.get("repository")
+                valid = (
+                    type(payload.get("id")) is int and payload.get("id") == run_id
+                    and payload.get("head_sha") == candidate
+                    and payload.get("head_branch") == "main"
+                    and payload.get("status") == "completed"
+                    and payload.get("conclusion") == "success"
+                    and payload.get("event") in ("push", "workflow_dispatch")
+                    and isinstance(head_repository, dict)
+                    and head_repository.get("full_name") == f"DruHustle/{repository}"
+                    and isinstance(repository_data, dict)
+                    and repository_data.get("full_name") == f"DruHustle/{repository}"
+                    and type(payload.get("workflow_id")) is int and payload["workflow_id"] > 0
+                    and isinstance(payload.get("path"), str)
+                    and payload["path"].startswith(".github/workflows/")
+                    and type(payload.get("run_attempt")) is int and payload["run_attempt"] > 0
+                )
+                if not valid:
+                    errors.append(
+                        f"{label} must be a completed successful push/dispatch on source main "
+                        f"at candidate {candidate}; repository, attempt and workflow metadata must match"
+                    )
+    return errors
 
 
 def has_qualified_limits(row):
@@ -306,7 +403,10 @@ def main():
     parser.add_argument("matrix", type=Path)
     parser.add_argument("--require-go", action="store_true")
     args = parser.parse_args()
-    errors = validate(json.loads(args.matrix.read_text()), args.require_go)
+    document = json.loads(args.matrix.read_text())
+    errors = validate(document, args.require_go)
+    if not errors:
+        errors.extend(verify_source_runs(document))
     if errors:
         for error in errors:
             print("FAIL:", error)
