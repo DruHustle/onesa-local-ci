@@ -29,6 +29,17 @@ SOURCE_REPOSITORIES = {
     "identity": "onesa-identity",
 }
 
+# Only reviewed production web hosts may be promoted to GO. Preview hosts and
+# unregistered product domains remain NO-GO until an owner reviews this list.
+PRODUCTION_WEB_HOSTS = {
+    "onesa-mobile": frozenset({"mobile.onesa.eu"}),
+    "pasofi": frozenset({"pasofi.mobile.onesa.eu"}),
+    "company-portal": frozenset({"portal.onesa.eu"}),
+    "documents-public": frozenset({"docs.onesa.eu"}),
+    "documents-internal": frozenset({"docs.internal.onesa.eu"}),
+    "identity": frozenset({"auth.onesa.eu"}),
+}
+
 
 def nonblank(value):
     return isinstance(value, str) and bool(value.strip())
@@ -46,9 +57,18 @@ def valid_evidence(link):
         parsed = urlsplit(link)
         parsed.port
         return (parsed.scheme == "https" and bool(parsed.hostname)
-                and parsed.username is None and parsed.password is None)
+                and parsed.username is None and parsed.password is None
+                and not parsed.query and not parsed.fragment)
     except ValueError:
         return False
+
+
+def valid_production_web_url(product, link):
+    if not valid_evidence(link):
+        return False
+    parsed = urlsplit(link)
+    return (parsed.hostname in PRODUCTION_WEB_HOSTS.get(product, ())
+            and parsed.port in (None, 443))
 
 
 UNVERIFIED_MARKERS = (
@@ -59,6 +79,11 @@ UNQUALIFIED_LIMIT_MARKERS = (
     "not qualified", "unqualified", "unknown", "pending", "unverified",
     "not established", "not tested",
 )
+
+
+def verified_text(value):
+    return (nonblank(value) and
+            not any(marker in value.casefold() for marker in UNVERIFIED_MARKERS))
 
 
 def has_observation(row):
@@ -133,6 +158,9 @@ def validate(document, require_go=False):
                       "support_owner", "operating_limits"):
             if not nonblank(row.get(field)):
                 errors.append(f"{key}: {field} must be nonblank")
+        for field in ("owner", "support_owner"):
+            if nonblank(row.get(field)) and not verified_text(row.get(field)):
+                errors.append(f"{key}: {field} must be verified, not unknown or pending")
         if row.get("decision") == "NO-GO" and not nonblank(row.get("blocker")):
             errors.append(f"{key}: NO-GO requires a concrete blocker")
         if row.get("platform") in ("ios", "android"):
@@ -140,8 +168,13 @@ def validate(document, require_go=False):
                 "not-submitted", "submitted", "accepted", "rejected"
             ):
                 errors.append(f"{key}: invalid store submission status")
-        if not isinstance(row.get("evidence"), list):
+        evidence = row.get("evidence")
+        if not isinstance(evidence, list):
             errors.append(f"{key}: evidence must be an array")
+        else:
+            for evidence_index, link in enumerate(evidence):
+                if not valid_evidence(link):
+                    errors.append(f"{key}: evidence[{evidence_index}] must be a credential-free HTTPS URL")
         if row.get("decision") == "GO":
             if not nonblank(row.get("candidate")):
                 errors.append(f"{key}: GO requires an exact release candidate")
@@ -149,6 +182,11 @@ def validate(document, require_go=False):
                 row["platform"] == "web" and not valid_evidence(row.get("release_url"))
             ):
                 errors.append(f"{key}: GO requires a deployed URL or installed build reference")
+            if row["platform"] == "web" and (
+                not valid_production_web_url(row["product"], row.get("release_url"))
+                or row.get("environment", "").strip().casefold() != "production"
+            ):
+                errors.append(f"{key}: web GO requires an allowlisted production host and exact production environment")
             if not isinstance(row.get("evidence"), list) or not row["evidence"] or not all(
                 valid_evidence(link) for link in row["evidence"]
             ):
@@ -207,6 +245,8 @@ def validate(document, require_go=False):
             errors.append(f"{key}: invalid scope decision")
         if not nonblank(row.get("owner")):
             errors.append(f"{key}: scope owner required")
+        elif not verified_text(row.get("owner")):
+            errors.append(f"{key}: scope owner must be verified, not unknown or pending")
         if not isinstance(row.get("blocker"), str):
             errors.append(f"{key}: scope blocker must be text")
         elif row.get("decision") == "NO-GO" and not nonblank(row.get("blocker")):
@@ -214,9 +254,15 @@ def validate(document, require_go=False):
         for field in ("environment", "observed_result", "support_owner", "operating_limits"):
             if not nonblank(row.get(field)):
                 errors.append(f"{key}: scope {field} must be nonblank")
+        if nonblank(row.get("support_owner")) and not verified_text(row.get("support_owner")):
+            errors.append(f"{key}: scope support_owner must be verified, not unknown or pending")
         evidence = row.get("evidence")
         if not isinstance(evidence, list):
             errors.append(f"{key}: scope evidence must be an array")
+        else:
+            for evidence_index, link in enumerate(evidence):
+                if not valid_evidence(link):
+                    errors.append(f"{key}: scope evidence[{evidence_index}] must be a credential-free HTTPS URL")
         for field in ("candidate", "environment", "role_tested",
                       "observed_result", "support_owner", "operating_limits"):
             if not isinstance(row.get(field), str):

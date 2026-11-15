@@ -119,6 +119,41 @@ class PortfolioGateTests(unittest.TestCase):
                 self.assertFalse(valid_evidence(url))
         self.assertTrue(valid_evidence("https://github.com:443/DruHustle/onesa-local-ci"))
 
+    def test_no_go_evidence_urls_are_validated_for_clients_and_scopes(self):
+        doc = copy.deepcopy(self.document)
+        doc["entries"][0]["evidence"] = ["https://user:password@example.com/private"]
+        doc["scope_gates"][0]["evidence"] = ["https://github.com/release/evidence?token=secret"]
+        errors = validate(doc)
+        self.assertTrue(any("evidence[0]" in error and "credential-free" in error for error in errors))
+        self.assertTrue(any("scope evidence[0]" in error and "credential-free" in error for error in errors))
+
+    def test_owner_and_support_owner_reject_unverified_markers(self):
+        doc = copy.deepcopy(self.document)
+        doc["entries"][0]["owner"] = "unknown"
+        doc["entries"][1]["support_owner"] = "pending"
+        doc["scope_gates"][0]["owner"] = "pending"
+        doc["scope_gates"][1]["support_owner"] = "unknown"
+        errors = validate(doc)
+        self.assertTrue(any("owner must be verified" in error for error in errors))
+        self.assertTrue(any("support_owner must be verified" in error for error in errors))
+        self.assertTrue(any("scope owner must be verified" in error for error in errors))
+        self.assertTrue(any("scope support_owner must be verified" in error for error in errors))
+
+    def test_web_go_requires_allowlisted_production_host_and_environment(self):
+        doc = copy.deepcopy(self.document)
+        row = doc["entries"][0]
+        candidate = "f" * 40
+        row.update(decision="GO", candidate=candidate, release_url="https://mobile.onesa.eu",
+                   evidence=self.evidence_for(row["product"], candidate), workflow="Customer sign-in",
+                   environment="production", role_tested="customer", observed_result="Sign-in completed",
+                   support_owner="mobile", operating_limits="Production web only", blocker="")
+        self.assertEqual(validate(doc), [])
+        row["release_url"] = "https://mobile-preview.vercel.app"
+        self.assertTrue(any("allowlisted production host" in error for error in validate(doc)))
+        row["release_url"] = "https://mobile.onesa.eu"
+        row["environment"] = "Vercel preview"
+        self.assertTrue(any("allowlisted production host" in error for error in validate(doc)))
+
     def test_matrix_root_must_be_object(self):
         self.assertIn("release matrix must be an object", validate([]))
 
@@ -136,7 +171,7 @@ class PortfolioGateTests(unittest.TestCase):
                     doc = copy.deepcopy(self.document)
                     row = doc[group][0]
                     candidate = "b" * 40
-                    row.update(decision="GO", candidate=candidate, environment="pilot", role_tested="operator",
+                    row.update(decision="GO", candidate=candidate, environment="production", role_tested="operator",
                                observed_result="Completed", support_owner="operator", operating_limits="One pilot",
                                evidence=self.evidence_for(row["product"], candidate), blocker="")
                     # A valid GO fixture is essential: otherwise this test
@@ -206,7 +241,7 @@ class PortfolioGateTests(unittest.TestCase):
     def test_verified_candidate_has_no_blocker(self):
         row = self.document["entries"][0]
         candidate = "c" * 40
-        row.update(decision="GO", candidate=candidate, environment="pilot",
+        row.update(decision="GO", candidate=candidate, environment="production",
                    release_url="https://mobile.onesa.eu",
                    evidence=self.evidence_for(row["product"], candidate),
                    role_tested="customer", observed_result="Customer task completed",
