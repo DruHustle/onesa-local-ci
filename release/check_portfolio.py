@@ -191,9 +191,11 @@ def validate(document, require_go=False):
                 row["platform"] == "web" and not valid_evidence(row.get("release_url"))
             ):
                 errors.append(f"{key}: GO requires a deployed URL or installed build reference")
+            environment = row.get("environment")
             if row["platform"] == "web" and (
                 not valid_production_web_url(row["product"], row.get("release_url"))
-                or row.get("environment", "").strip().casefold() != "production"
+                or not isinstance(environment, str)
+                or environment.strip().casefold() != "production"
             ):
                 errors.append(f"{key}: web GO requires an allowlisted production host and exact production environment")
             if not isinstance(row.get("evidence"), list) or not row["evidence"] or not all(

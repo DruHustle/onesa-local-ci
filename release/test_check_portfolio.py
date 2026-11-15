@@ -119,6 +119,18 @@ class PortfolioGateTests(unittest.TestCase):
                 self.assertFalse(valid_evidence(url))
         self.assertTrue(valid_evidence("https://github.com:443/DruHustle/onesa-local-ci"))
 
+    def test_malformed_web_environment_never_crashes_validation(self):
+        doc = copy.deepcopy(self.document)
+        row = doc["entries"][0]
+        candidate = "a" * 40
+        row.update(decision="GO", candidate=candidate, release_url="https://mobile.onesa.eu",
+                   evidence=self.evidence_for(row["product"], candidate), workflow="Customer sign-in",
+                   environment=["production"], role_tested="customer", observed_result="Sign-in completed",
+                   support_owner="mobile", operating_limits="Production web only", blocker="")
+        errors = validate(doc)
+        self.assertTrue(any("environment must be text" in error for error in errors))
+        self.assertTrue(any("allowlisted production host" in error for error in errors))
+
     def test_no_go_candidate_and_release_urls_are_typed_and_safe(self):
         doc = copy.deepcopy(self.document)
         doc["entries"][0]["candidate"] = ["not", "a", "commit"]
