@@ -78,8 +78,16 @@ def main():
     # Check the complete paginated inventory, not only eligible candidates:
     # a duplicate whose second copy has malformed metadata is still ambiguous.
     # Abort before any DELETE rather than letting the valid-looking copy win.
-    ids = [item["id"] for item in records
-           if isinstance(item, dict) and type(item.get("id")) is int and item["id"] > 0]
+    if not isinstance(records, list) or any(not isinstance(item, dict) for item in records):
+        parser.error("Malformed artifact record in API listing; no deletion permitted")
+    ids = []
+    for item in records:
+        artifact_id = item.get("id")
+        # Do not silently ignore malformed IDs: a string/float/bool copy of
+        # an otherwise valid ID is still an ambiguous inventory record.
+        if type(artifact_id) is not int or artifact_id <= 0:
+            parser.error("Malformed artifact ID in API listing; no deletion permitted")
+        ids.append(artifact_id)
     if len(ids) != len(set(ids)):
         parser.error("Duplicate artifact IDs in API listing; no deletion permitted")
     now = dt.datetime.now(UTC)
