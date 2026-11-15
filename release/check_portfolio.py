@@ -161,10 +161,13 @@ def validate(document, require_go=False):
                 errors.append(f"{key}: GO requires an observed role-specific workflow")
             if not nonblank(row.get("support_owner")) or not has_qualified_limits(row):
                 errors.append(f"{key}: GO requires support ownership and qualified operating limits")
-            if row["platform"] in ("ios", "android") and (
-                row.get("store_submission") != "accepted" or not nonblank(row.get("store_receipt"))
-            ):
-                errors.append(f"{key}: GO requires native store acceptance receipt")
+            if row["platform"] in ("ios", "android"):
+                receipt = row.get("store_receipt")
+                receipt_is_unverified = (not nonblank(receipt) or any(
+                    marker in receipt.casefold() for marker in UNVERIFIED_MARKERS
+                ))
+                if row.get("store_submission") != "accepted" or receipt_is_unverified:
+                    errors.append(f"{key}: GO requires native store acceptance receipt")
             if not isinstance(row.get("blocker"), str) or row["blocker"].strip():
                 errors.append(f"{key}: GO cannot have an open blocker")
         elif require_go:
