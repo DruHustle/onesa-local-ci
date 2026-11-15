@@ -30,6 +30,13 @@ SOURCE_REPOSITORIES = {
     "identity": "onesa-identity",
 }
 
+# A source run is not acceptance merely because its workflow file is under
+# .github/workflows/. Populate these exact paths and required job names only
+# after independently reviewing that product repository's acceptance contract.
+# Empty entries deliberately fail closed; this controller does not guess.
+APPROVED_SOURCE_WORKFLOWS = {product: frozenset() for product in SOURCE_REPOSITORIES}
+APPROVED_SOURCE_JOBS = {product: frozenset() for product in SOURCE_REPOSITORIES}
+
 # Only reviewed production web hosts may be promoted to GO. Preview hosts and
 # unregistered product domains remain NO-GO until an owner reviews this list.
 PRODUCTION_WEB_HOSTS = {
@@ -174,12 +181,31 @@ def fetch_source_run(repository, run_id):
     return payload
 
 
-def verify_source_runs(document, fetch_json=fetch_source_run):
-    """Require every cited GO workflow run to prove the exact successful main candidate."""
+def fetch_source_run_jobs(repository, run_id, attempt):
+    """Read jobs for the exact source workflow-run attempt, without credentials."""
+    url = (
+        f"https://api.github.com/repos/DruHustle/{repository}/actions/"
+        f"runs/{run_id}/attempts/{attempt}/jobs?per_page=100"
+    )
+    request = Request(url, headers={
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "User-Agent": "onesa-local-ci-release-evidence",
+    })
+    with urlopen(request, timeout=20) as response:
+        payload = json.load(response)
+    if not isinstance(payload, dict):
+        raise ValueError("GitHub returned a non-object workflow-jobs response")
+    return payload
+
+
+def verify_source_runs(document, fetch_json=fetch_source_run, fetch_jobs=fetch_source_run_jobs):
+    """Require each GO source run and its allowlisted acceptance jobs to pass."""
     if not isinstance(document, dict):
         return ["source workflow evidence: release matrix must be an object"]
     errors = []
     cache = {}
+    jobs_cache = {}
     for group in ("entries", "scope_gates"):
         rows = document.get(group)
         if not isinstance(rows, list):
@@ -195,17 +221,24 @@ def verify_source_runs(document, fetch_json=fetch_source_run):
             run_refs = source_run_references(product, row.get("evidence"))
             if not repository or not run_refs:
                 continue  # Static validation reports missing source-bound links.
+            approved_workflows = APPROVED_SOURCE_WORKFLOWS.get(product, frozenset())
+            approved_jobs = APPROVED_SOURCE_JOBS.get(product, frozenset())
             for run_id, cited_attempt in run_refs:
                 cache_key = (repository, run_id)
+                label = f"{group}[{index}] ({product}): workflow run {run_id}"
+                if cited_attempt is not None:
+                    label += f" attempt {cited_attempt}"
+                if not approved_workflows or not approved_jobs:
+                    errors.append(
+                        f"{label} has no reviewed acceptance workflow/job allowlist for {product}; refusing GO"
+                    )
+                    continue
                 if cache_key not in cache:
                     try:
                         cache[cache_key] = fetch_json(repository, run_id)
                     except Exception as exc:
                         cache[cache_key] = exc
                 payload = cache[cache_key]
-                label = f"{group}[{index}] ({product}): workflow run {run_id}"
-                if cited_attempt is not None:
-                    label += f" attempt {cited_attempt}"
                 if isinstance(payload, Exception):
                     errors.append(f"{label} could not be verified ({type(payload).__name__}); refusing GO")
                     continue
@@ -214,6 +247,7 @@ def verify_source_runs(document, fetch_json=fetch_source_run):
                     continue
                 head_repository = payload.get("head_repository")
                 repository_data = payload.get("repository")
+                attempt = payload.get("run_attempt")
                 valid = (
                     type(payload.get("id")) is int and payload.get("id") == run_id
                     and payload.get("head_sha") == candidate
@@ -227,15 +261,46 @@ def verify_source_runs(document, fetch_json=fetch_source_run):
                     and repository_data.get("full_name") == f"DruHustle/{repository}"
                     and type(payload.get("workflow_id")) is int and payload["workflow_id"] > 0
                     and isinstance(payload.get("path"), str)
-                    and payload["path"].startswith(".github/workflows/")
-                    and type(payload.get("run_attempt")) is int and payload["run_attempt"] > 0
-                    and (cited_attempt is None or payload.get("run_attempt") == cited_attempt)
+                    and payload["path"] in approved_workflows
+                    and type(attempt) is int and attempt > 0
+                    and (cited_attempt is None or attempt == cited_attempt)
                 )
                 if not valid:
                     errors.append(
                         f"{label} must be a completed successful push/dispatch on source main "
-                        f"at candidate {candidate}; repository, attempt and workflow metadata must match"
+                        f"at candidate {candidate}, using an allowlisted workflow path and matching attempt"
                     )
+                    continue
+                jobs_key = (repository, run_id, attempt)
+                if jobs_key not in jobs_cache:
+                    try:
+                        jobs_cache[jobs_key] = fetch_jobs(repository, run_id, attempt)
+                    except Exception as exc:
+                        jobs_cache[jobs_key] = exc
+                job_payload = jobs_cache[jobs_key]
+                if isinstance(job_payload, Exception):
+                    errors.append(
+                        f"{label} acceptance jobs could not be verified "
+                        f"({type(job_payload).__name__}); refusing GO"
+                    )
+                    continue
+                if not isinstance(job_payload, dict):
+                    errors.append(f"{label} returned malformed acceptance-job metadata; refusing GO")
+                    continue
+                jobs = job_payload.get("jobs")
+                total_count = job_payload.get("total_count")
+                if (not isinstance(jobs, list) or type(total_count) is not int
+                        or total_count != len(jobs) or any(not isinstance(job, dict) for job in jobs)):
+                    errors.append(f"{label} acceptance-job inventory is incomplete or malformed; refusing GO")
+                    continue
+                for job_name in sorted(approved_jobs):
+                    matches = [job for job in jobs if job.get("name") == job_name]
+                    if (len(matches) != 1 or matches[0].get("status") != "completed"
+                            or matches[0].get("conclusion") != "success"):
+                        errors.append(
+                            f"{label} required acceptance job {job_name!r} must appear exactly once "
+                            "and complete successfully"
+                        )
     return errors
 
 
