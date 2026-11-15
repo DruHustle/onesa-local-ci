@@ -16,7 +16,18 @@ class PortfolioGateTests(unittest.TestCase):
         self.assertEqual(validate(self.document), [])
 
     def test_incomplete_portfolio_cannot_launch(self):
-        self.assertEqual(len(validate(self.document, require_go=True)), 28)
+        self.assertEqual(len(validate(self.document, require_go=True)), 41)
+
+    def test_all_thirteen_scope_gates_are_present(self):
+        self.assertEqual(len(self.document["scope_gates"]), 13)
+        self.assertEqual(validate(self.document), [])
+
+    def test_missing_wifi_site_is_rejected(self):
+        self.document["scope_gates"] = [
+            row for row in self.document["scope_gates"]
+            if not (row["kind"] == "wifi-site" and row["scope"] == "G3")
+        ]
+        self.assertTrue(any("missing scope" in x for x in validate(self.document)))
 
     def test_duplicate_client_is_rejected(self):
         self.document["entries"].append(copy.deepcopy(self.document["entries"][0]))
