@@ -44,6 +44,16 @@ class ArtifactCleanupTests(unittest.TestCase):
             with self.subTest(timestamp=timestamp):
                 self.assertFalse(cleanup.eligible(artifact, self.now, 14))
 
+    def test_missing_or_non_string_artifact_name_is_never_deleted(self):
+        for name in (None, 42, [], {}):
+            artifact = self.item("ci-old", "2026-09-01T00:00:00Z")
+            if name is None:
+                artifact.pop("name")
+            else:
+                artifact["name"] = name
+            with self.subTest(name=name):
+                self.assertFalse(cleanup.eligible(artifact, self.now, 14))
+
     def test_expired_artifacts_not_redeleted(self):
         self.assertFalse(cleanup.eligible(
             self.item("ci-old", "2026-09-01T00:00:00Z", True),
