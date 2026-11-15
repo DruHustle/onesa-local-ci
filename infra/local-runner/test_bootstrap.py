@@ -26,6 +26,12 @@ class RunnerTest(unittest.TestCase):
                 f'contents/.github/workflows/{boot.WORKFLOW}?ref=main': {
                     'content': base64.b64encode(boot.reviewed_workflow().read_bytes()).decode()}}
 
+    def test_release_gate_runs_for_operator_policy_files(self):
+        workflow = (HERE.parents[1] / ".github/workflows/portfolio-gates.yml").read_text()
+        for path in ("README.md", "AGENTS.md", ".gitignore"):
+            with self.subTest(path=path):
+                self.assertEqual(workflow.count(f'      - "{path}"'), 2)
+
     def test_generated_python_bytecode_is_ignored(self):
         root = boot.HERE.parents[1]
         for path in (
