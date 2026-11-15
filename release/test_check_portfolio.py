@@ -2,7 +2,9 @@ import copy
 import json
 import unittest
 from pathlib import Path
-from release.check_portfolio import validate, verify_source_runs
+from unittest.mock import patch
+from release.check_portfolio import (APPROVED_SOURCE_JOBS, APPROVED_SOURCE_WORKFLOWS,
+                                     SOURCE_REPOSITORIES, validate, verify_source_runs)
 
 MATRIX = Path(__file__).with_name("portfolio-gates-20261115.json")
 
@@ -10,6 +12,26 @@ MATRIX = Path(__file__).with_name("portfolio-gates-20261115.json")
 class PortfolioGateTests(unittest.TestCase):
     def setUp(self):
         self.document = json.loads(MATRIX.read_text())
+        # Test-only policy fixture. Production allowlists remain empty until
+        # each source repository's exact acceptance workflow/job is reviewed.
+        self.workflow_policy = patch.dict(
+            APPROVED_SOURCE_WORKFLOWS,
+            {product: frozenset({".github/workflows/verify.yml@refs/heads/main"})
+             for product in SOURCE_REPOSITORIES},
+        )
+        self.job_policy = patch.dict(
+            APPROVED_SOURCE_JOBS,
+            {product: frozenset({"verify"}) for product in SOURCE_REPOSITORIES},
+        )
+        self.workflow_policy.start()
+        self.job_policy.start()
+        self.addCleanup(self.workflow_policy.stop)
+        self.addCleanup(self.job_policy.stop)
+
+    def successful_jobs(self, _repository, _run_id, _attempt):
+        return {"total_count": 1, "jobs": [
+            {"name": "verify", "status": "completed", "conclusion": "success"}
+        ]}
 
     def evidence_for(self, product, sha):
         repositories = {
@@ -293,7 +315,7 @@ class PortfolioGateTests(unittest.TestCase):
         def fetch(repository, run_id):
             calls.append((repository, run_id))
             return valid
-        self.assertEqual(verify_source_runs(self.document, fetch), [])
+        self.assertEqual(verify_source_runs(self.document, fetch, self.successful_jobs), [])
         self.assertEqual(calls, [("onesa-mobile", 123)])
 
         invalid_cases = (
@@ -312,7 +334,7 @@ class PortfolioGateTests(unittest.TestCase):
         for changes in invalid_cases:
             payload = dict(valid, **changes)
             with self.subTest(changes=changes):
-                errors = verify_source_runs(self.document, lambda _repo, _id: payload)
+                errors = verify_source_runs(self.document, lambda _repo, _id: payload, self.successful_jobs)
                 self.assertTrue(any("must be a completed successful" in error for error in errors), errors)
 
     def test_failed_observed_outcomes_cannot_be_promoted_to_go(self):
@@ -365,7 +387,7 @@ class PortfolioGateTests(unittest.TestCase):
             "workflow_id": 7, "path": ".github/workflows/verify.yml",
             "run_attempt": 1,
         }
-        errors = verify_source_runs(self.document, lambda _repo, _run_id: valid)
+        errors = verify_source_runs(self.document, lambda _repo, _run_id: valid, self.successful_jobs)
         self.assertTrue(any("attempt 2" in error and "must be a completed successful" in error
                             for error in errors), errors)
         evidence[-1] = "https://github.com/DruHustle/onesa-mobile/actions/runs/123/attempts/1"
@@ -403,8 +425,95 @@ class PortfolioGateTests(unittest.TestCase):
         errors = verify_source_runs(
             self.document,
             lambda _repo, _run_id: (_ for _ in ()).throw(TimeoutError("unavailable")),
+            self.successful_jobs,
         )
         self.assertTrue(any("could not be verified" in error for error in errors), errors)
+
+
+    def test_go_requires_an_explicit_reviewed_workflow_and_job_allowlist(self):
+        row = self.document["entries"][0]
+        candidate = "a" * 40
+        row.update(decision="GO", candidate=candidate,
+                   evidence=self.evidence_for(row["product"], candidate))
+        calls = []
+        with patch.dict(APPROVED_SOURCE_WORKFLOWS, {"onesa-mobile": frozenset()}), patch.dict(
+            APPROVED_SOURCE_JOBS, {"onesa-mobile": frozenset()}
+        ):
+            errors = verify_source_runs(
+                self.document, lambda *args: calls.append(args), self.successful_jobs
+            )
+        self.assertTrue(any("no reviewed acceptance workflow/job allowlist" in error for error in errors))
+        self.assertEqual(calls, [])
+
+    def test_source_run_rejects_unapproved_workflow_path(self):
+        row = self.document["entries"][0]
+        candidate = "a" * 40
+        row.update(decision="GO", candidate=candidate,
+                   evidence=self.evidence_for(row["product"], candidate))
+        payload = {
+            "id": 123, "head_sha": candidate, "head_branch": "main",
+            "status": "completed", "conclusion": "success", "event": "push",
+            "head_repository": {"full_name": "DruHustle/onesa-mobile"},
+            "repository": {"full_name": "DruHustle/onesa-mobile"},
+            "workflow_id": 7, "path": ".github/workflows/unreviewed.yml@refs/heads/main",
+            "run_attempt": 1,
+        }
+        job_calls = []
+        errors = verify_source_runs(
+            self.document, lambda _repo, _run_id: payload,
+            lambda *args: job_calls.append(args) or self.successful_jobs(*args),
+        )
+        self.assertTrue(any("allowlisted workflow path" in error for error in errors), errors)
+        self.assertEqual(job_calls, [])
+
+    def test_source_run_requires_the_named_acceptance_job_to_succeed_exactly_once(self):
+        row = self.document["entries"][0]
+        candidate = "a" * 40
+        row.update(decision="GO", candidate=candidate,
+                   evidence=self.evidence_for(row["product"], candidate))
+        payload = {
+            "id": 123, "head_sha": candidate, "head_branch": "main",
+            "status": "completed", "conclusion": "success", "event": "push",
+            "head_repository": {"full_name": "DruHustle/onesa-mobile"},
+            "repository": {"full_name": "DruHustle/onesa-mobile"},
+            "workflow_id": 7, "path": ".github/workflows/verify.yml@refs/heads/main",
+            "run_attempt": 1,
+        }
+        bad_job_sets = (
+            [],
+            [{"name": "verify", "status": "completed", "conclusion": "failure"}],
+            [{"name": "verify", "status": "completed", "conclusion": "skipped"}],
+            [{"name": "verify", "status": "in_progress", "conclusion": None}],
+            [{"name": "verify", "status": "completed", "conclusion": "success"}] * 2,
+        )
+        for jobs in bad_job_sets:
+            with self.subTest(jobs=jobs):
+                errors = verify_source_runs(
+                    self.document, lambda _repo, _run_id: payload,
+                    lambda _repo, _run_id, _attempt: {"total_count": len(jobs), "jobs": jobs},
+                )
+                self.assertTrue(any("required acceptance job" in error for error in errors), errors)
+
+    def test_source_run_rejects_truncated_acceptance_job_inventory(self):
+        row = self.document["entries"][0]
+        candidate = "a" * 40
+        row.update(decision="GO", candidate=candidate,
+                   evidence=self.evidence_for(row["product"], candidate))
+        payload = {
+            "id": 123, "head_sha": candidate, "head_branch": "main",
+            "status": "completed", "conclusion": "success", "event": "push",
+            "head_repository": {"full_name": "DruHustle/onesa-mobile"},
+            "repository": {"full_name": "DruHustle/onesa-mobile"},
+            "workflow_id": 7, "path": ".github/workflows/verify.yml@refs/heads/main",
+            "run_attempt": 1,
+        }
+        errors = verify_source_runs(
+            self.document, lambda _repo, _run_id: payload,
+            lambda _repo, _run_id, _attempt: {"total_count": 101, "jobs": [
+                {"name": "verify", "status": "completed", "conclusion": "success"}
+            ]},
+        )
+        self.assertTrue(any("inventory is incomplete" in error for error in errors), errors)
 
     def test_no_go_matrix_does_not_make_external_evidence_requests(self):
         calls = []
@@ -424,7 +533,7 @@ class PortfolioGateTests(unittest.TestCase):
             "workflow_id": 8, "path": ".github/workflows/verify.yml",
             "run_attempt": 1,
         }
-        errors = verify_source_runs(self.document, lambda _repo, _run_id: payload)
+        errors = verify_source_runs(self.document, lambda _repo, _run_id: payload, self.successful_jobs)
         self.assertTrue(any("scope_gates[0]" in error for error in errors), errors)
 
 
