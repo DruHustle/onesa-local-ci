@@ -9,10 +9,21 @@ DISPOSABLE_PREFIXES = ("ci-", "preview-", "browser-", "test-")
 UTC = dt.timezone.utc
 
 
-def eligible(artifact, now, days):
+def eligible(artifact, now, days, repo_id):
     # Treat API response metadata as untrusted. Only a real positive artifact
     # ID is eligible; booleans and malformed records must never be deleted.
     if not isinstance(artifact, dict):
+        return False
+    if type(repo_id) is not int or repo_id <= 0 or not isinstance(now, dt.datetime) or now.tzinfo is None:
+        return False
+    provenance = artifact.get("workflow_run")
+    if not isinstance(provenance, dict) or type(provenance.get("id")) is not int or provenance["id"] <= 0:
+        return False
+    if any(type(provenance.get(field)) is not int or provenance[field] != repo_id
+           for field in ("repository_id", "head_repository_id")):
+        return False
+    size = artifact.get("size_in_bytes")
+    if type(size) is not int or size < 0:
         return False
     artifact_id = artifact.get("id")
     if type(artifact_id) is not int or artifact_id <= 0 or artifact.get("expired") is not False:
@@ -47,16 +58,30 @@ def main():
     parser.add_argument("--older-than-days", type=int, default=14)
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--confirm-repo", default="")
+    parser.add_argument("--confirm-id", type=int, action="append", default=[], metavar="ARTIFACT_ID",
+                        help="Explicitly approve this artifact ID for deletion; repeat for each ID")
     args = parser.parse_args()
     if args.older_than_days < 7:
         parser.error("Retention cannot be shorter than seven days")
     if args.apply and args.confirm_repo != args.repo:
         parser.error("Deletion requires --confirm-repo matching --repo")
+    if args.apply and not args.confirm_id:
+        parser.error("Deletion requires each artifact ID to be approved with --confirm-id")
+    metadata = json.loads(gh("api", f"repos/{args.repo}"))
+    if not isinstance(metadata, dict) or metadata.get("full_name") != args.repo or (
+        type(metadata.get("id")) is not int or metadata["id"] <= 0
+    ):
+        parser.error("Repository identity could not be verified")
     lines = gh("api", "--paginate", "--jq", ".artifacts[] | @json",
                f"repos/{args.repo}/actions/artifacts").splitlines()
     now = dt.datetime.now(UTC)
     candidates = [item for line in lines if (item := json.loads(line))
-                  and eligible(item, now, args.older_than_days)]
+                  and eligible(item, now, args.older_than_days, metadata["id"])]
+    if args.apply:
+        approved = set(args.confirm_id)
+        if len(approved) != len(args.confirm_id) or not approved <= {item["id"] for item in candidates}:
+            parser.error("Every confirmed artifact ID must be unique and currently eligible")
+        candidates = [item for item in candidates if item["id"] in approved]
     total = sum(int(item.get("size_in_bytes", 0)) for item in candidates)
     for item in candidates:
         print(f"{'DELETE' if args.apply else 'DRY-RUN'} "
