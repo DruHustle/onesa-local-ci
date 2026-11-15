@@ -88,6 +88,12 @@ def validate(document, require_go=False):
                       "operating_limits"):
             if not isinstance(row.get(field), str):
                 errors.append(f"{key}: {field} must be text")
+        for field in ("owner", "workflow", "environment", "observed_result",
+                      "support_owner", "operating_limits"):
+            if not nonblank(row.get(field)):
+                errors.append(f"{key}: {field} must be nonblank")
+        if row.get("decision") == "NO-GO" and not nonblank(row.get("blocker")):
+            errors.append(f"{key}: NO-GO requires a concrete blocker")
         if row.get("platform") in ("ios", "android"):
             if row.get("store_submission") not in (
                 "not-submitted", "submitted", "accepted", "rejected"
@@ -153,8 +159,15 @@ def validate(document, require_go=False):
             errors.append(f"unknown scope {key}")
         if row.get("decision") not in ("GO", "NO-GO"):
             errors.append(f"{key}: invalid scope decision")
-        if not isinstance(row.get("owner"), str) or not row.get("owner"):
+        if not nonblank(row.get("owner")):
             errors.append(f"{key}: scope owner required")
+        if not isinstance(row.get("blocker"), str):
+            errors.append(f"{key}: scope blocker must be text")
+        elif row.get("decision") == "NO-GO" and not nonblank(row.get("blocker")):
+            errors.append(f"{key}: NO-GO scope requires a concrete blocker")
+        for field in ("environment", "observed_result", "support_owner", "operating_limits"):
+            if not nonblank(row.get(field)):
+                errors.append(f"{key}: scope {field} must be nonblank")
         evidence = row.get("evidence")
         if not isinstance(evidence, list):
             errors.append(f"{key}: scope evidence must be an array")

@@ -141,6 +141,22 @@ class PortfolioGateTests(unittest.TestCase):
                     self.assertTrue(any(reason in error for error in validate(doc)),
                                     (group, field, validate(doc)))
 
+    def test_no_go_rows_require_nonblank_owners_and_concrete_blockers(self):
+        doc = copy.deepcopy(self.document)
+        doc["entries"][0]["owner"] = " "
+        doc["entries"][1]["support_owner"] = ""
+        doc["entries"][2]["blocker"] = " "
+        doc["scope_gates"][0]["owner"] = " "
+        doc["scope_gates"][1]["support_owner"] = ""
+        doc["scope_gates"][2]["blocker"] = None
+        errors = validate(doc)
+        self.assertTrue(any("owner must be nonblank" in error for error in errors))
+        self.assertTrue(any("support_owner must be nonblank" in error for error in errors))
+        self.assertTrue(any("NO-GO requires a concrete blocker" in error for error in errors))
+        self.assertTrue(any("scope owner required" in error for error in errors))
+        self.assertTrue(any("scope support_owner must be nonblank" in error for error in errors))
+        self.assertTrue(any("scope blocker must be text" in error for error in errors))
+
     def test_verified_candidate_has_no_blocker(self):
         row = self.document["entries"][0]
         row.update(decision="GO", candidate="sha256:verified", environment="pilot",
