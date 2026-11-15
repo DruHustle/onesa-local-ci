@@ -10,12 +10,15 @@ DISPOSABLE_PREFIXES = ("ci-", "preview-", "browser-", "test-")
 UTC = dt.timezone.utc
 
 
-def eligible(artifact, now, days, repo_id):
+def eligible(artifact, now, days, repo_id, default_branch="main"):
     # Treat API response metadata as untrusted. Only a real positive artifact
     # ID is eligible; booleans and malformed records must never be deleted.
     if not isinstance(artifact, dict):
         return False
-    if type(repo_id) is not int or repo_id <= 0 or not isinstance(now, dt.datetime) or now.tzinfo is None:
+    if (type(repo_id) is not int or repo_id <= 0
+            or not isinstance(default_branch, str) or not default_branch
+            or default_branch != default_branch.strip()
+            or not isinstance(now, dt.datetime) or now.tzinfo is None):
         return False
     provenance = artifact.get("workflow_run")
     if not isinstance(provenance, dict) or type(provenance.get("id")) is not int or provenance["id"] <= 0:
@@ -34,7 +37,9 @@ def eligible(artifact, now, days, repo_id):
     # Never clean artifacts originating from protected/release branches,
     # even when their names happen to use a disposable prefix.
     protected_branch = branch.casefold()
-    if (protected_branch in {"main", "master", "release", "production", "hotfix"}
+    protected_names = {"main", "master", "release", "production", "hotfix",
+                       default_branch.casefold()}
+    if (protected_branch in protected_names
             or protected_branch.startswith(("release/", "production/", "hotfix/"))):
         return False
     size = artifact.get("size_in_bytes")
@@ -85,8 +90,10 @@ def main():
     metadata = json.loads(gh("api", f"repos/{args.repo}"))
     if not isinstance(metadata, dict) or metadata.get("full_name") != args.repo or (
         type(metadata.get("id")) is not int or metadata["id"] <= 0
+        or not isinstance(metadata.get("default_branch"), str)
+        or not metadata["default_branch"] or metadata["default_branch"] != metadata["default_branch"].strip()
     ):
-        parser.error("Repository identity could not be verified")
+        parser.error("Repository identity or default branch could not be verified")
     lines = gh("api", "--paginate", "--jq", ".artifacts[] | @json",
                f"repos/{args.repo}/actions/artifacts").splitlines()
     records = [json.loads(line) for line in lines]
@@ -107,7 +114,7 @@ def main():
         parser.error("Duplicate artifact IDs in API listing; no deletion permitted")
     now = dt.datetime.now(UTC)
     candidates = [item for item in records
-                  if eligible(item, now, args.older_than_days, metadata["id"])]
+                  if eligible(item, now, args.older_than_days, metadata["id"], metadata["default_branch"])]
     if args.apply:
         approved = set(args.confirm_id)
         if len(approved) != len(args.confirm_id) or not approved <= {item["id"] for item in candidates}:
