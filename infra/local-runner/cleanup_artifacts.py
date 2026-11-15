@@ -10,7 +10,12 @@ UTC = dt.timezone.utc
 
 
 def eligible(artifact, now, days):
-    if not artifact.get("id") or artifact.get("expired"):
+    # Treat API response metadata as untrusted. Only a real positive artifact
+    # ID is eligible; booleans and malformed records must never be deleted.
+    if not isinstance(artifact, dict):
+        return False
+    artifact_id = artifact.get("id")
+    if type(artifact_id) is not int or artifact_id <= 0 or artifact.get("expired") is not False:
         return False
     name = artifact.get("name")
     if not isinstance(name, str) or not any(
