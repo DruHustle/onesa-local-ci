@@ -227,6 +227,12 @@ systemctl() {
                 self.assertEqual(target.read_bytes(), source)
                 self.assertEqual(target.stat().st_mode & 0o777, 0o700)
 
+    def test_release_gate_validates_all_maintained_runner_modules(self):
+        workflow = boot.reviewed_workflow('portfolio-gates.yml').read_text()
+        self.assertIn('"infra/local-runner/**"', workflow)
+        self.assertIn("-p 'test_*.py' -v", workflow)
+        self.assertIn("python -m unittest discover -s infra/local-runner", workflow)
+
     def test_service_setup_shell_and_workflow_contract(self):
         subprocess.run(['bash', '-n', str(HERE / 'guest.sh')], check=True)
         setup = (HERE / 'guest.sh').read_text()
