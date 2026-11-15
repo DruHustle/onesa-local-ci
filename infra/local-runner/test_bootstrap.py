@@ -143,7 +143,7 @@ class RunnerTest(unittest.TestCase):
                 patch.object(boot.platform, 'machine', return_value='arm64'), \
                 patch.object(boot.shutil, 'which', return_value='/bin/tool'), \
                 patch.object(boot.os, 'geteuid', return_value=501), patch.object(boot, 'controller'), \
-                patch.object(boot, 'provision_vm'), patch('builtins.print'), \
+                patch.object(boot, 'trusted_checkout'), patch.object(boot, 'provision_vm'), patch('builtins.print'), \
                 patch.object(boot, 'guest', side_effect=[b'', None, interrupted_setup, configured, None, None]) as guest, \
                 patch.object(boot, 'remote_runner', side_effect=[None, offline, registered]), \
                 patch.object(boot, 'api', return_value={'token': 'synthetic-registration'}) as api, \
