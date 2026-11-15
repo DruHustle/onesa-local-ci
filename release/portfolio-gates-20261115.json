@@ -26,15 +26,18 @@
       "candidate": "",
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
-      "evidence": [],
-      "blocker": "Signed build, installed-device workflow and store receipt unverified",
+      "evidence": [
+        "https://github.com/DruHustle/onesa-mobile/actions/runs/43592963058"
+      ],
+      "blocker": "CI native artifact exists; signed distribution, final installed workflow and store receipt unverified",
       "environment": "device (unverified)",
       "role_tested": "",
-      "observed_result": "Not tested on the release candidate",
+      "observed_result": "Unsigned iOS simulator and Android debug artifacts retained; signed device release unverified",
       "support_owner": "provider-integration",
       "operating_limits": "Not qualified",
       "store_submission": "not-submitted",
-      "store_receipt": null
+      "store_receipt": null,
+      "build_identifier": "onesa-mobile-ios-simulator-unsigned-d05e66c3"
     },
     {
       "product": "onesa-mobile",
@@ -44,15 +47,18 @@
       "candidate": "",
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
-      "evidence": [],
-      "blocker": "Signed build, installed-device workflow and store receipt unverified",
+      "evidence": [
+        "https://github.com/DruHustle/onesa-mobile/actions/runs/43592963058"
+      ],
+      "blocker": "CI native artifact exists; signed distribution, final installed workflow and store receipt unverified",
       "environment": "device (unverified)",
       "role_tested": "",
-      "observed_result": "Not tested on the release candidate",
+      "observed_result": "Unsigned iOS simulator and Android debug artifacts retained; signed device release unverified",
       "support_owner": "provider-integration",
       "operating_limits": "Not qualified",
       "store_submission": "not-submitted",
-      "store_receipt": null
+      "store_receipt": null,
+      "build_identifier": "onesa-mobile-android-arm64-debug-d05e66c3"
     },
     {
       "product": "pasofi",
@@ -234,15 +240,18 @@
       "candidate": "",
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
-      "evidence": [],
-      "blocker": "Signed build, installed-device workflow and store receipt unverified",
+      "evidence": [
+        "https://github.com/DruHustle/smart-farmer/actions/runs/43645620532"
+      ],
+      "blocker": "CI native artifact exists; signed distribution, final installed workflow and store receipt unverified",
       "environment": "device (unverified)",
       "role_tested": "",
-      "observed_result": "Not tested on the release candidate",
+      "observed_result": "Native acceptance artifacts retained; iOS rerun and physical device release unverified",
       "support_owner": "operations",
       "operating_limits": "Not qualified",
       "store_submission": "not-submitted",
-      "store_receipt": null
+      "store_receipt": null,
+      "build_identifier": "native-ios-acceptance"
     },
     {
       "product": "smart-farmer",
@@ -252,15 +261,18 @@
       "candidate": "",
       "release_url": null,
       "workflow": "Protected customer/operator workflow and Onesa callback",
-      "evidence": [],
-      "blocker": "Signed build, installed-device workflow and store receipt unverified",
+      "evidence": [
+        "https://github.com/DruHustle/smart-farmer/actions/runs/43645620532"
+      ],
+      "blocker": "CI native artifact exists; signed distribution, final installed workflow and store receipt unverified",
       "environment": "device (unverified)",
       "role_tested": "",
-      "observed_result": "Not tested on the release candidate",
+      "observed_result": "Native acceptance artifacts retained; iOS rerun and physical device release unverified",
       "support_owner": "operations",
       "operating_limits": "Not qualified",
       "store_submission": "not-submitted",
-      "store_receipt": null
+      "store_receipt": null,
+      "build_identifier": "native-android-acceptance"
     },
     {
       "product": "smart-logistics",
