@@ -2,7 +2,7 @@ import copy
 import json
 import unittest
 from pathlib import Path
-from release.check_portfolio import validate
+from release.check_portfolio import validate, verify_source_runs
 
 MATRIX = Path(__file__).with_name("portfolio-gates-20261115.json")
 
@@ -274,6 +274,101 @@ class PortfolioGateTests(unittest.TestCase):
                    operating_limits="Web-only validated scope", support_owner="mobile",
                    blocker="")
         self.assertEqual(validate(self.document), [])
+
+
+    def test_source_workflow_run_must_match_exact_successful_main_candidate(self):
+        row = self.document["entries"][0]
+        candidate = "d" * 40
+        row.update(decision="GO", candidate=candidate,
+                   evidence=self.evidence_for(row["product"], candidate))
+        valid = {
+            "id": 123, "head_sha": candidate, "head_branch": "main",
+            "status": "completed", "conclusion": "success", "event": "push",
+            "head_repository": {"full_name": "DruHustle/onesa-mobile"},
+            "repository": {"full_name": "DruHustle/onesa-mobile"},
+            "workflow_id": 7, "path": ".github/workflows/verify.yml@refs/heads/main",
+            "run_attempt": 1,
+        }
+        calls = []
+        def fetch(repository, run_id):
+            calls.append((repository, run_id))
+            return valid
+        self.assertEqual(verify_source_runs(self.document, fetch), [])
+        self.assertEqual(calls, [("onesa-mobile", 123)])
+
+        invalid_cases = (
+            {"head_sha": "e" * 40},
+            {"head_branch": "feature/release"},
+            {"status": "in_progress", "conclusion": None},
+            {"conclusion": "failure"},
+            {"event": "pull_request"},
+            {"head_repository": {"full_name": "attacker/onesa-mobile"}},
+            {"repository": {"full_name": "DruHustle/onesa-documents"}},
+            {"id": 999},
+            {"workflow_id": 0},
+            {"path": "README.md"},
+            {"run_attempt": 0},
+        )
+        for changes in invalid_cases:
+            payload = dict(valid, **changes)
+            with self.subTest(changes=changes):
+                errors = verify_source_runs(self.document, lambda _repo, _id: payload)
+                self.assertTrue(any("must be a completed successful" in error for error in errors), errors)
+
+    def test_every_cited_source_run_is_checked_not_just_one_matching_run(self):
+        row = self.document["entries"][0]
+        candidate = "f" * 40
+        row.update(decision="GO", candidate=candidate,
+                   evidence=self.evidence_for(row["product"], candidate) + [
+                       "https://github.com/DruHustle/onesa-mobile/actions/runs/456"
+                   ])
+        good = {
+            "id": 123, "head_sha": candidate, "head_branch": "main",
+            "status": "completed", "conclusion": "success", "event": "push",
+            "head_repository": {"full_name": "DruHustle/onesa-mobile"},
+            "repository": {"full_name": "DruHustle/onesa-mobile"},
+            "workflow_id": 7, "path": ".github/workflows/verify.yml",
+            "run_attempt": 1,
+        }
+        calls = []
+        def fetch(repository, run_id):
+            calls.append(run_id)
+            return dict(good, id=run_id, head_sha=("a" * 40 if run_id == 456 else candidate))
+        errors = verify_source_runs(self.document, fetch)
+        self.assertEqual(calls, [123, 456])
+        self.assertTrue(any("workflow run 456" in error for error in errors), errors)
+
+    def test_source_workflow_run_lookup_failure_fails_closed(self):
+        row = self.document["entries"][0]
+        candidate = "b" * 40
+        row.update(decision="GO", candidate=candidate,
+                   evidence=self.evidence_for(row["product"], candidate))
+        errors = verify_source_runs(
+            self.document,
+            lambda _repo, _run_id: (_ for _ in ()).throw(TimeoutError("unavailable")),
+        )
+        self.assertTrue(any("could not be verified" in error for error in errors), errors)
+
+    def test_no_go_matrix_does_not_make_external_evidence_requests(self):
+        calls = []
+        self.assertEqual(verify_source_runs(self.document, lambda *args: calls.append(args)), [])
+        self.assertEqual(calls, [])
+
+    def test_scope_go_also_requires_live_source_run_verification(self):
+        gate = self.document["scope_gates"][0]
+        candidate = "c" * 40
+        gate.update(decision="GO", candidate=candidate, blocker="",
+                    evidence=self.evidence_for("pasofi", candidate))
+        payload = {
+            "id": 123, "head_sha": "9" * 40, "head_branch": "main",
+            "status": "completed", "conclusion": "success", "event": "push",
+            "head_repository": {"full_name": "DruHustle/pasofi"},
+            "repository": {"full_name": "DruHustle/pasofi"},
+            "workflow_id": 8, "path": ".github/workflows/verify.yml",
+            "run_attempt": 1,
+        }
+        errors = verify_source_runs(self.document, lambda _repo, _run_id: payload)
+        self.assertTrue(any("scope_gates[0]" in error for error in errors), errors)
 
 
 if __name__ == "__main__":
