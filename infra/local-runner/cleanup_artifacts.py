@@ -8,6 +8,8 @@ import subprocess
 
 REPOSITORY = "DruHustle/onesa-local-ci"
 DISPOSABLE_PREFIXES = ("ci-", "preview-", "browser-", "test-")
+# No artifact-producing workflow has been reviewed for deletion; fail closed until one is approved.
+DISPOSABLE_WORKFLOW_IDS = frozenset()
 UTC = dt.timezone.utc
 
 
@@ -23,6 +25,13 @@ def eligible(artifact, now, days, repo_id, default_branch="main"):
         return False
     provenance = artifact.get("workflow_run")
     if not isinstance(provenance, dict) or type(provenance.get("id")) is not int or provenance["id"] <= 0:
+        return False
+    workflow_id = provenance.get("workflow_id")
+    if (type(workflow_id) is not int or workflow_id <= 0
+            or workflow_id not in DISPOSABLE_WORKFLOW_IDS
+            or provenance.get("status") != "completed"
+            or provenance.get("conclusion") != "success"
+            or provenance.get("event") not in ("push", "workflow_dispatch")):
         return False
     if any(type(provenance.get(field)) is not int or provenance[field] != repo_id
            for field in ("repository_id", "head_repository_id")):
