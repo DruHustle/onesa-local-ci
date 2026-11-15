@@ -76,6 +76,14 @@ UNVERIFIED_MARKERS = (
     "unverified", "not tested", "not run", "not observed", "not verified",
     "pending", "unknown", "no evidence",
 )
+OWNER_PLACEHOLDER_MARKERS = (
+    "tbd", "to be determined", "unassigned", "not assigned", "n/a", "not applicable", "none",
+)
+OBSERVED_FAILURE_MARKERS = (
+    "failed", "failure", "unsuccessful", "not passed", "did not pass",
+    "error", "blocked", "incomplete", "timed out", "timeout",
+    "cancelled", "canceled", "aborted",
+)
 UNQUALIFIED_LIMIT_MARKERS = (
     "not qualified", "unqualified", "unknown", "pending", "unverified",
     "not established", "not tested",
@@ -87,6 +95,11 @@ def verified_text(value):
             not any(marker in value.casefold() for marker in UNVERIFIED_MARKERS))
 
 
+def verified_owner(value):
+    return (verified_text(value) and
+            not any(marker in value.casefold() for marker in OWNER_PLACEHOLDER_MARKERS))
+
+
 def has_observation(row):
     # A GO must identify the workflow, tested role, environment and observed
     # outcome. A nonblank phrase such as "not tested" is not acceptance.
@@ -95,7 +108,11 @@ def has_observation(row):
     if not all(nonblank(value) for value in values) or len(values) < 3:
         return False
     evidence_text = " ".join(values).casefold()
-    return not any(marker in evidence_text for marker in UNVERIFIED_MARKERS)
+    if any(marker in evidence_text for marker in UNVERIFIED_MARKERS):
+        return False
+    outcome = row.get("observed_result", "").casefold()
+    return not any(re.search(r"(?<!\\w)" + re.escape(marker) + r"(?!\\w)", outcome)
+                   for marker in OBSERVED_FAILURE_MARKERS)
 
 
 def has_source_bound_evidence(product, candidate, evidence):
@@ -122,22 +139,24 @@ def has_source_bound_evidence(product, candidate, evidence):
 
 
 def source_run_references(product, evidence):
-    """Return every workflow-run ID cited for a GO row in its source repository."""
+    """Return each cited workflow-run ID and any explicitly linked attempt."""
     repository = SOURCE_REPOSITORIES.get(product)
     if not repository or not isinstance(evidence, list):
         return []
     prefix = f"/DruHustle/{repository}/actions/runs/"
-    run_ids = []
+    run_refs = []
     for link in evidence:
         if not valid_evidence(link):
             continue
         parsed = urlsplit(link)
         if parsed.hostname != "github.com" or parsed.port not in (None, 443):
             continue
-        match = re.fullmatch(re.escape(prefix) + r"([0-9]+)(?:/attempts/[0-9]+)?", parsed.path)
+        match = re.fullmatch(re.escape(prefix) + r"([0-9]+)(?:/attempts/([0-9]+))?", parsed.path)
         if match:
-            run_ids.append(int(match.group(1)))
-    return sorted(set(run_ids))
+            reference = (int(match.group(1)), int(match.group(2)) if match.group(2) else None)
+            if reference not in run_refs:
+                run_refs.append(reference)
+    return run_refs
 
 
 def fetch_source_run(repository, run_id):
@@ -176,7 +195,7 @@ def verify_source_runs(document, fetch_json=fetch_source_run):
             run_ids = source_run_references(product, row.get("evidence"))
             if not repository or not run_ids:
                 continue  # Static validation reports missing source-bound links.
-            for run_id in run_ids:
+            for run_id, cited_attempt in run_refs:
                 cache_key = (repository, run_id)
                 if cache_key not in cache:
                     try:
@@ -185,6 +204,8 @@ def verify_source_runs(document, fetch_json=fetch_source_run):
                         cache[cache_key] = exc
                 payload = cache[cache_key]
                 label = f"{group}[{index}] ({product}): workflow run {run_id}"
+                if cited_attempt is not None:
+                    label += f" attempt {cited_attempt}"
                 if isinstance(payload, Exception):
                     errors.append(f"{label} could not be verified ({type(payload).__name__}); refusing GO")
                     continue
@@ -208,6 +229,7 @@ def verify_source_runs(document, fetch_json=fetch_source_run):
                     and isinstance(payload.get("path"), str)
                     and payload["path"].startswith(".github/workflows/")
                     and type(payload.get("run_attempt")) is int and payload["run_attempt"] > 0
+                    and (cited_attempt is None or payload.get("run_attempt") == cited_attempt)
                 )
                 if not valid:
                     errors.append(
@@ -267,7 +289,7 @@ def validate(document, require_go=False):
             if not nonblank(row.get(field)):
                 errors.append(f"{key}: {field} must be nonblank")
         for field in ("owner", "support_owner"):
-            if nonblank(row.get(field)) and not verified_text(row.get(field)):
+            if nonblank(row.get(field)) and not verified_owner(row.get(field)):
                 errors.append(f"{key}: {field} must be verified, not unknown or pending")
         if row.get("decision") == "NO-GO" and not nonblank(row.get("blocker")):
             errors.append(f"{key}: NO-GO requires a concrete blocker")
@@ -355,7 +377,7 @@ def validate(document, require_go=False):
             errors.append(f"{key}: invalid scope decision")
         if not nonblank(row.get("owner")):
             errors.append(f"{key}: scope owner required")
-        elif not verified_text(row.get("owner")):
+        elif not verified_owner(row.get("owner")):
             errors.append(f"{key}: scope owner must be verified, not unknown or pending")
         if not isinstance(row.get("blocker"), str):
             errors.append(f"{key}: scope blocker must be text")
@@ -364,7 +386,7 @@ def validate(document, require_go=False):
         for field in ("environment", "observed_result", "support_owner", "operating_limits"):
             if not nonblank(row.get(field)):
                 errors.append(f"{key}: scope {field} must be nonblank")
-        if nonblank(row.get("support_owner")) and not verified_text(row.get("support_owner")):
+        if nonblank(row.get("support_owner")) and not verified_owner(row.get("support_owner")):
             errors.append(f"{key}: scope support_owner must be verified, not unknown or pending")
         evidence = row.get("evidence")
         if not isinstance(evidence, list):
