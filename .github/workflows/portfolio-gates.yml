@@ -4,13 +4,13 @@ on:
     paths:
       - "release/**"
       - "infra/local-runner/**"
-      - ".github/workflows/portfolio-gates.yml"
+      - ".github/workflows/**"
   push:
     branches: [main]
     paths:
       - "release/**"
       - "infra/local-runner/**"
-      - ".github/workflows/portfolio-gates.yml"
+      - ".github/workflows/**"
   workflow_dispatch:
 permissions:
   contents: read

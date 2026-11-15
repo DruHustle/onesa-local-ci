@@ -89,6 +89,21 @@ class PortfolioGateTests(unittest.TestCase):
                 self.assertFalse(valid_evidence(url))
         self.assertTrue(valid_evidence("https://github.com/DruHustle/onesa-local-ci/actions/runs/123"))
 
+    def test_evidence_url_is_not_silently_normalized(self):
+        from release.check_portfolio import valid_evidence
+        for url in (
+            "https://github.com/\nrelease/evidence",
+            "https://github.com/\tbad",
+            "https://github.com/\rbad",
+            " https://github.com/release/evidence",
+            "https://github.com:invalid/path",
+            "https://github.com:65536/path",
+            "https://github.com/\x7fbad",
+        ):
+            with self.subTest(url=url):
+                self.assertFalse(valid_evidence(url))
+        self.assertTrue(valid_evidence("https://github.com:443/DruHustle/onesa-local-ci"))
+
     def test_matrix_root_must_be_object(self):
         self.assertIn("release matrix must be an object", validate([]))
 
