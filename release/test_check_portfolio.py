@@ -118,8 +118,23 @@ class PortfolioGateTests(unittest.TestCase):
                     row.update(decision="GO", candidate="build-1", environment="pilot", role_tested="operator",
                                observed_result="Completed", support_owner="operator", operating_limits="One pilot",
                                evidence=["https://example.org/receipt"], blocker="")
+                    # A valid GO fixture is essential: otherwise this test
+                    # could pass for unrelated missing release metadata.
+                    self.assertEqual(validate(doc), [])
                     row[field] = value
-                    self.assertTrue(validate(doc))
+                    reason = (
+                        {"environment": "observed role-specific workflow",
+                         "operating_limits": "support ownership",
+                         "observed_result": "observed role-specific workflow",
+                         "evidence": "linked acceptance evidence"}
+                        if group == "entries" else
+                        {"environment": "scoped candidate",
+                         "operating_limits": "scoped candidate",
+                         "observed_result": "scoped candidate",
+                         "evidence": "scope acceptance evidence"}
+                    )[field]
+                    self.assertTrue(any(reason in error for error in validate(doc)),
+                                    (group, field, validate(doc)))
 
     def test_verified_candidate_has_no_blocker(self):
         row = self.document["entries"][0]
