@@ -26,6 +26,39 @@ class RunnerTest(unittest.TestCase):
                 f'contents/.github/workflows/{boot.WORKFLOW}?ref=main': {
                     'content': base64.b64encode(boot.reviewed_workflow().read_bytes()).decode()}}
 
+    def test_bootstrap_requires_clean_canonical_exact_main_checkout(self):
+        root = boot.HERE.parents[1].resolve()
+        good_sha = "a" * 40
+
+        def exercise(status="", head=good_sha, origin="https://github.com/DruHustle/onesa-local-ci.git",
+                     top=None, remote_sha=good_sha):
+            def fake_run(*args, **kwargs):
+                command = args[3:]
+                if command == ("rev-parse", "--show-toplevel"):
+                    return str(top or root).encode()
+                if command == ("remote", "get-url", "origin"):
+                    return origin.encode()
+                if command == ("status", "--porcelain", "--untracked-files=all"):
+                    return status.encode()
+                if command == ("rev-parse", "HEAD"):
+                    return head.encode()
+                raise AssertionError(args)
+            with patch.object(boot, "run", side_effect=fake_run), \\
+                 patch.object(boot, "api", return_value={"sha": remote_sha}):
+                return boot.trusted_checkout()
+
+        self.assertIsNone(exercise())
+        for kwargs in (
+            {"status": " M infra/local-runner/guest.sh"},
+            {"status": "?? untracked.py"},
+            {"head": "b" * 40},
+            {"origin": "https://github.com/DruHustle/onesa-company-portal.git"},
+            {"top": root / "nested"},
+            {"remote_sha": "not-a-full-commit"},
+        ):
+            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                exercise(**kwargs)
+
     def test_only_expected_private_controller_can_register(self):
         for field, value in [('private', False), ('full_name', 'DruHustle/onesa-company-portal'), ('default_branch', 'dev')]:
             with self.subTest(field=field):

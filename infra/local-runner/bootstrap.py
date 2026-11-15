@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -72,6 +73,27 @@ def controller():
                 f'The active {name} workflow differs from this reviewed checkout.')
 
 
+def trusted_checkout():
+    """Only run privileged bootstrap code from the clean, exact owner main checkout."""
+    root = HERE.parents[1].resolve()
+    top = run('git', '-C', str(root), 'rev-parse', '--show-toplevel', capture=True).decode().strip()
+    require(Path(top).resolve() == root, 'Run bootstrap from the canonical repository checkout.')
+    origin = run('git', '-C', str(root), 'remote', 'get-url', 'origin', capture=True).decode().strip()
+    normalized_origin = origin.removesuffix('.git').rstrip('/')
+    require(normalized_origin in (
+        f'https://github.com/{REPO}', f'git@github.com:{REPO}'
+    ), 'Checkout origin must be the canonical private controller repository.')
+    dirty = run('git', '-C', str(root), 'status', '--porcelain', '--untracked-files=all',
+                capture=True).decode()
+    require(not dirty.strip(), 'Refusing to execute modified or untracked local controller code.')
+    local_sha = run('git', '-C', str(root), 'rev-parse', 'HEAD', capture=True).decode().strip()
+    remote = api('commits/main')
+    remote_sha = remote.get('sha') if isinstance(remote, dict) else None
+    require(isinstance(remote_sha, str) and re.fullmatch(r'[0-9a-f]{40}', remote_sha)
+            and local_sha == remote_sha,
+            'Checkout must be the exact current owner-reviewed main commit.')
+
+
 def instances():
     raw = run('limactl', 'list', '--json', capture=True)
     return {item['name']: item for item in (json.loads(line) for line in raw.splitlines() if line)}
@@ -120,6 +142,7 @@ def configure():
     require(shutil.which('gh') and shutil.which('limactl'), 'Install GitHub CLI and Lima on this Mac first.')
     require(os.geteuid() != 0, 'Run as the signed-in macOS user.')
     controller()
+    trusted_checkout()
     state = Path.home() / 'Library/Application Support/Onesa/local-ci'
     state.mkdir(mode=0o700, parents=True, exist_ok=True)
     with (state / 'setup.lock').open('a') as lock:
