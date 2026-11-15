@@ -88,6 +88,19 @@ class ArtifactCleanupTests(unittest.TestCase):
             with self.subTest(size=bad_size):
                 self.assertFalse(cleanup.eligible(artifact, self.now, 14, self.repo_id))
 
+    def test_cleanup_is_hard_scoped_to_the_controller_repository(self):
+        from unittest.mock import patch
+        for apply in (False, True):
+            args = ["cleanup", "--repo", "DruHustle/onesa-company-portal",
+                    "--confirm-repo", "DruHustle/onesa-company-portal"]
+            if apply:
+                args.extend(["--apply", "--confirm-id", "123"])
+            with self.subTest(apply=apply), patch("sys.argv", args), \\
+                 patch.object(cleanup, "gh") as gh:
+                with self.assertRaises(SystemExit):
+                    cleanup.main()
+                gh.assert_not_called()
+
     def test_apply_refuses_deletion_without_explicit_artifact_ids(self):
         from unittest.mock import patch
         with patch("sys.argv", ["cleanup_artifacts", "--apply", "--confirm-repo",
