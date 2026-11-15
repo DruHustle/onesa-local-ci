@@ -18,35 +18,28 @@ def nonblank(value):
     return isinstance(value, str) and bool(value.strip())
 
 
-def linked_evidence(evidence):
-    if not isinstance(evidence, list) or not evidence:
+def valid_evidence(link):
+    if not nonblank(link) or any(ch.isspace() for ch in link):
         return False
-    for link in evidence:
-        if not nonblank(link) or any(ch.isspace() for ch in link):
-            return False
-        try:
-            url = urlsplit(link)
-            if url.scheme != "https" or not url.hostname:
-                return False
-        except ValueError:
-            return False
-    return True
+    try:
+        parsed = urlsplit(link)
+        return (parsed.scheme == "https" and bool(parsed.hostname)
+                and parsed.username is None and parsed.password is None)
+    except ValueError:
+        return False
 
 
-def qualified_environment(row):
+def has_observation(row):
     environment = row.get("environment")
-    return nonblank(environment) and not environment.strip().casefold().endswith("(unverified)")
-
-
-def observed(row):
-    return (nonblank(row.get("observed_result"))
-            and row["observed_result"].strip() not in
-            ("Not tested on the release candidate", "Not tested at site/provider/hardware"))
+    outcome = row.get("observed_result")
+    return (nonblank(environment) and not environment.strip().casefold().endswith("(unverified)")
+            and nonblank(outcome) and outcome.strip().casefold() not in
+            ("not tested on the release candidate", "not tested at site/provider/hardware"))
 
 
 def validate(document, require_go=False):
     if not isinstance(document, dict):
-        return ["matrix must be an object"]
+        return ["release matrix must be an object"]
     rows = document.get("entries")
     if not isinstance(rows, list):
         return ["entries must be an array"]
@@ -56,10 +49,10 @@ def validate(document, require_go=False):
         if not isinstance(row, dict):
             errors.append(f"entry {index}: must be an object")
             continue
-        key = (row.get("product"), row.get("platform"))
-        if not all(nonblank(part) for part in key):
-            errors.append(f"entry {index}: expected product and platform names")
+        if not isinstance(row.get("product"), str) or not isinstance(row.get("platform"), str):
+            errors.append(f"entry {index}: product and platform must be text")
             continue
+        key = (row["product"], row["platform"])
         if key in seen:
             errors.append(f"duplicate client {key}")
         seen.add(key)
@@ -82,19 +75,28 @@ def validate(document, require_go=False):
         if row.get("decision") == "GO":
             if not nonblank(row.get("candidate")):
                 errors.append(f"{key}: GO requires an exact release candidate")
-            if not nonblank(row.get("release_url")):
+            if not nonblank(row.get("release_url")) or (
+                row["platform"] == "web" and not valid_evidence(row.get("release_url"))
+            ):
                 errors.append(f"{key}: GO requires a deployed URL or installed build reference")
-            if not linked_evidence(row.get("evidence")):
+            if not isinstance(row.get("evidence"), list) or not row["evidence"] or not all(
+                valid_evidence(link) for link in row["evidence"]
+            ):
                 errors.append(f"{key}: GO requires linked acceptance evidence")
-            if not all(nonblank(row.get(field)) for field in ("owner", "workflow", "role_tested")) or not observed(row) or not qualified_environment(row):
-                errors.append(f"{key}: GO requires an observed role-specific workflow and environment")
-            if not nonblank(row.get("support_owner")) or not nonblank(row.get("operating_limits")) or row["operating_limits"].strip() == "Not qualified":
+            if not all(nonblank(row.get(field)) for field in (
+                "owner", "workflow", "environment", "role_tested", "observed_result"
+            )) or not has_observation(row):
+                errors.append(f"{key}: GO requires an observed role-specific workflow")
+            if not nonblank(row.get("support_owner")) or not nonblank(row.get("operating_limits")) or (
+                isinstance(row.get("operating_limits"), str) and
+                row["operating_limits"].strip().casefold() == "not qualified"
+            ):
                 errors.append(f"{key}: GO requires support ownership and operating limits")
-            if row.get("platform") in ("ios", "android") and (
+            if row["platform"] in ("ios", "android") and (
                 row.get("store_submission") != "accepted" or not nonblank(row.get("store_receipt"))
             ):
                 errors.append(f"{key}: GO requires native store acceptance receipt")
-            if row.get("blocker"):
+            if not isinstance(row.get("blocker"), str) or row["blocker"].strip():
                 errors.append(f"{key}: GO cannot have an open blocker")
         elif require_go:
             errors.append(f"{key}: NO-GO")
@@ -120,10 +122,10 @@ def validate(document, require_go=False):
         if not isinstance(row, dict):
             errors.append(f"scope {index}: must be an object")
             continue
-        key = (row.get("product"), row.get("kind"), row.get("scope"))
-        if not all(nonblank(part) for part in key):
-            errors.append(f"scope {index}: expected product, kind and scope names")
+        if not all(isinstance(row.get(field), str) for field in ("product", "kind", "scope")):
+            errors.append(f"scope {index}: product, kind and scope must be text")
             continue
+        key = (row["product"], row["kind"], row["scope"])
         if key in observed_scopes:
             errors.append(f"duplicate scope {key}")
         observed_scopes.add(key)
@@ -131,7 +133,7 @@ def validate(document, require_go=False):
             errors.append(f"unknown scope {key}")
         if row.get("decision") not in ("GO", "NO-GO"):
             errors.append(f"{key}: invalid scope decision")
-        if not nonblank(row.get("owner")):
+        if not isinstance(row.get("owner"), str) or not row.get("owner"):
             errors.append(f"{key}: scope owner required")
         evidence = row.get("evidence")
         if not isinstance(evidence, list):
@@ -141,14 +143,19 @@ def validate(document, require_go=False):
             if not isinstance(row.get(field), str):
                 errors.append(f"{key}: {field} must be text")
         if row.get("decision") == "GO":
-            if not linked_evidence(evidence):
+            if not isinstance(evidence, list) or not evidence or not all(
+                valid_evidence(link) for link in evidence
+            ):
                 errors.append(f"{key}: GO requires scope acceptance evidence")
             if not all(nonblank(row.get(field)) for field in (
-                "candidate", "environment", "role_tested", "observed_result",
+                "owner", "candidate", "environment", "role_tested", "observed_result",
                 "support_owner", "operating_limits"
-            )) or row["operating_limits"].strip() == "Not qualified" or not observed(row) or not qualified_environment(row):
+            )) or (
+                isinstance(row.get("operating_limits"), str)
+                and row["operating_limits"].strip().casefold() == "not qualified"
+            ) or not has_observation(row):
                 errors.append(f"{key}: GO requires scoped candidate, observed result, operator and limits")
-            if row.get("blocker"):
+            if not isinstance(row.get("blocker"), str) or row["blocker"].strip():
                 errors.append(f"{key}: GO cannot retain scope blocker")
         elif require_go:
             errors.append(f"{key}: scope NO-GO")
