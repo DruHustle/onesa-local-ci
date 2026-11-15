@@ -315,6 +315,63 @@ class PortfolioGateTests(unittest.TestCase):
                 errors = verify_source_runs(self.document, lambda _repo, _id: payload)
                 self.assertTrue(any("must be a completed successful" in error for error in errors), errors)
 
+    def test_failed_observed_outcomes_cannot_be_promoted_to_go(self):
+        for group in ("entries", "scope_gates"):
+            for outcome in ("Failed: customer sign-in", "Customer workflow timed out",
+                            "Payment returned an error", "Operator task was blocked",
+                            "Deployment was cancelled"):
+                with self.subTest(group=group, outcome=outcome):
+                    doc = copy.deepcopy(self.document)
+                    row = doc[group][0]
+                    candidate = "8" * 40
+                    row.update(decision="GO", candidate=candidate, blocker="",
+                               environment="production", role_tested="operator",
+                               observed_result="Completed successfully",
+                               support_owner="operations", operating_limits="Verified pilot limits",
+                               evidence=self.evidence_for(row["product"], candidate))
+                    if group == "entries":
+                        row.update(release_url="https://mobile.onesa.eu",
+                                   workflow="Customer sign-in")
+                    self.assertEqual(validate(doc), [])
+                    row["observed_result"] = outcome
+                    self.assertTrue(any("observed role-specific workflow" in error
+                                        or "scoped candidate" in error
+                                        for error in validate(doc)),
+                                    (group, outcome, validate(doc)))
+
+    def test_placeholder_owner_and_support_owner_are_not_verified(self):
+        doc = copy.deepcopy(self.document)
+        doc["entries"][0]["owner"] = "unassigned"
+        doc["entries"][1]["support_owner"] = "TBD"
+        doc["scope_gates"][0]["owner"] = "N/A"
+        doc["scope_gates"][1]["support_owner"] = "not assigned"
+        errors = validate(doc)
+        self.assertTrue(any("owner must be verified" in error for error in errors))
+        self.assertTrue(any("support_owner must be verified" in error for error in errors))
+        self.assertTrue(any("scope owner must be verified" in error for error in errors))
+        self.assertTrue(any("scope support_owner must be verified" in error for error in errors))
+
+    def test_cited_workflow_run_attempt_must_match_exact_attempt_url(self):
+        row = self.document["entries"][0]
+        candidate = "9" * 40
+        evidence = self.evidence_for(row["product"], candidate)
+        evidence[-1] = f"https://github.com/DruHustle/onesa-mobile/actions/runs/123/attempts/2"
+        row.update(decision="GO", candidate=candidate, evidence=evidence)
+        valid = {
+            "id": 123, "head_sha": candidate, "head_branch": "main",
+            "status": "completed", "conclusion": "success", "event": "push",
+            "head_repository": {"full_name": "DruHustle/onesa-mobile"},
+            "repository": {"full_name": "DruHustle/onesa-mobile"},
+            "workflow_id": 7, "path": ".github/workflows/verify.yml",
+            "run_attempt": 1,
+        }
+        errors = verify_source_runs(self.document, lambda _repo, _run_id: valid)
+        self.assertTrue(any("attempt 2" in error and "must be a completed successful" in error
+                            for error in errors), errors)
+        evidence[-1] = "https://github.com/DruHustle/onesa-mobile/actions/runs/123/attempts/1"
+        row["evidence"] = evidence
+        self.assertEqual(verify_source_runs(self.document, lambda _repo, _run_id: valid), [])
+
     def test_every_cited_source_run_is_checked_not_just_one_matching_run(self):
         row = self.document["entries"][0]
         candidate = "f" * 40
