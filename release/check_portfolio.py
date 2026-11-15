@@ -19,10 +19,16 @@ def nonblank(value):
 
 
 def valid_evidence(link):
-    if not nonblank(link) or any(ch.isspace() for ch in link):
+    # urlsplit silently strips tabs/newlines and leading C0 controls.
+    # Evidence must be an exact, unambiguous URL rather than one repaired
+    # during parsing. Reject nonnumeric and out-of-range ports as well.
+    if not nonblank(link) or any(
+        char.isspace() or ord(char) < 0x20 or ord(char) == 0x7f for char in link
+    ):
         return False
     try:
         parsed = urlsplit(link)
+        parsed.port
         return (parsed.scheme == "https" and bool(parsed.hostname)
                 and parsed.username is None and parsed.password is None)
     except ValueError:

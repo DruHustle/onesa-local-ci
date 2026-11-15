@@ -67,6 +67,19 @@ class RunnerTest(unittest.TestCase):
         with patch.object(boot, 'api', side_effect=values.__getitem__), self.assertRaises(ValueError):
             boot.controller()
 
+    def test_truncated_or_malformed_controller_inventory_is_rejected(self):
+        for collaborators in ([{'login': 'DruHustle'}] * 100, {'login': 'DruHustle'},
+                              [None], [{'login': None}]):
+            with self.subTest(collaborators=collaborators):
+                values = self.metadata()
+                values['collaborators?per_page=100'] = collaborators
+                with patch.object(boot, 'api', side_effect=values.__getitem__), self.assertRaises(ValueError):
+                    boot.controller()
+        values = self.metadata()
+        values['contents/.github/workflows?ref=main'] = [{'name': boot.WORKFLOW}] * 1000
+        with patch.object(boot, 'api', side_effect=values.__getitem__), self.assertRaises(ValueError):
+            boot.controller()
+
     def test_owner_without_separate_collaborator_entry_can_configure(self):
         values = self.metadata()
         values['collaborators?per_page=100'] = []
@@ -230,6 +243,7 @@ systemctl() {
     def test_release_gate_validates_all_maintained_runner_modules(self):
         workflow = boot.reviewed_workflow('portfolio-gates.yml').read_text()
         self.assertIn('"infra/local-runner/**"', workflow)
+        self.assertIn('".github/workflows/**"', workflow)
         self.assertIn("-p 'test_*.py' -v", workflow)
         self.assertIn("python -m unittest discover -s infra/local-runner", workflow)
 

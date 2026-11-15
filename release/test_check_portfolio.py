@@ -84,17 +84,34 @@ class PortfolioGateTests(unittest.TestCase):
     def test_malformed_evidence_urls_are_not_accepted(self):
         from release.check_portfolio import valid_evidence
         for url in ("https://", "https://[broken", "http://example.com",
-                    "https://user:pass@example.com/path", "https://a b.example", "not-a-link", ""):
+                    "https://user:pass@example.com/path", "not-a-link", ""):
             with self.subTest(url=url):
                 self.assertFalse(valid_evidence(url))
         self.assertTrue(valid_evidence("https://github.com/DruHustle/onesa-local-ci/actions/runs/123"))
 
+    def test_evidence_url_is_not_silently_normalized(self):
+        from release.check_portfolio import valid_evidence
+        for url in (
+            "https://github.com/\nrelease/evidence",
+            "https://github.com/\tbad",
+            "https://github.com/\rbad",
+            " https://github.com/release/evidence",
+            "https://github.com:invalid/path",
+            "https://github.com:65536/path",
+            "https://github.com/\x7fbad",
+        ):
+            with self.subTest(url=url):
+                self.assertFalse(valid_evidence(url))
+        self.assertTrue(valid_evidence("https://github.com:443/DruHustle/onesa-local-ci"))
+
     def test_matrix_root_must_be_object(self):
         self.assertIn("release matrix must be an object", validate([]))
 
-    def test_blank_or_unobserved_evidence_cannot_pass(self):
+    def test_unverified_environment_or_unobserved_results_cannot_pass(self):
         for group in ("entries", "scope_gates"):
-            for field, value in (("environment", " "), ("environment", "production (unverified)"), ("operating_limits", ""), ("observed_result", "Not tested at site/provider/hardware"), ("evidence", ["https://"])):
+            for field, value in (("environment", " "), ("environment", "production (unverified)"),
+                                 ("operating_limits", ""), ("observed_result", "Not tested at site/provider/hardware"),
+                                 ("evidence", ["https://"])):
                 with self.subTest(group=group, field=field):
                     doc = copy.deepcopy(self.document)
                     row = doc[group][0]

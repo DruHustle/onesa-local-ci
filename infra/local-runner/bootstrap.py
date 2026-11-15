@@ -48,11 +48,17 @@ def controller():
             and metadata.get('default_branch') == 'main' and metadata.get('permissions', {}).get('admin'),
             'The owner-administered private controller with default main is required.')
     collaborators = api('collaborators?per_page=100')
-    require({item['login'] for item in collaborators} <= {REPO.split('/')[0]},
-            'Dedicated controller requires owner-only access.')
+    # GitHub returns at most 100 collaborators per page here. Refuse a
+    # saturated page rather than accepting a potentially partial permission
+    # inventory; this private controller must have owner-only access.
+    require(isinstance(collaborators, list) and len(collaborators) < 100
+            and all(isinstance(item, dict) and item.get('login') == REPO.split('/')[0]
+                    for item in collaborators),
+            'Dedicated controller requires a complete owner-only collaborator inventory.')
     entries = api('contents/.github/workflows?ref=main')
-    require(isinstance(entries, list) and all(isinstance(entry, dict) for entry in entries),
-            'Unexpected private controller workflow listing.')
+    require(isinstance(entries, list) and len(entries) < 1000
+            and all(isinstance(entry, dict) for entry in entries),
+            'Unexpected or incomplete private controller workflow listing.')
     names = [entry.get('name') for entry in entries]
     require(len(names) == len(set(names)) and WORKFLOW in names
             and set(names) <= ALLOWED_WORKFLOWS,
