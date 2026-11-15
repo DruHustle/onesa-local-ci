@@ -6,6 +6,7 @@ import json
 import re
 import subprocess
 
+REPOSITORY = "DruHustle/onesa-local-ci"
 DISPOSABLE_PREFIXES = ("ci-", "preview-", "browser-", "test-")
 UTC = dt.timezone.utc
 
@@ -74,13 +75,15 @@ def gh(*args):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--repo", default="DruHustle/onesa-local-ci")
+    parser.add_argument("--repo", default=REPOSITORY)
     parser.add_argument("--older-than-days", type=int, default=14)
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--confirm-repo", default="")
     parser.add_argument("--confirm-id", type=int, action="append", default=[], metavar="ARTIFACT_ID",
                         help="Explicitly approve this artifact ID for deletion; repeat for each ID")
     args = parser.parse_args()
+    if args.repo != REPOSITORY:
+        parser.error(f"This cleanup utility is restricted to {REPOSITORY}")
     if args.older_than_days < 7:
         parser.error("Retention cannot be shorter than seven days")
     if args.apply and args.confirm_repo != args.repo:
