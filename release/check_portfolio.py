@@ -102,9 +102,18 @@ def validate(document, require_go=False):
         evidence = row.get("evidence")
         if not isinstance(evidence, list):
             errors.append(f"{key}: scope evidence must be an array")
+        for field in ("candidate", "environment", "role_tested",
+                      "observed_result", "support_owner", "operating_limits"):
+            if not isinstance(row.get(field), str):
+                errors.append(f"{key}: {field} must be text")
         if row.get("decision") == "GO":
             if not evidence or not all(isinstance(link, str) and link.startswith("https://") for link in evidence):
                 errors.append(f"{key}: GO requires scope acceptance evidence")
+            if not all(row.get(field) for field in (
+                "candidate", "environment", "role_tested", "observed_result",
+                "support_owner", "operating_limits"
+            )) or row.get("operating_limits") == "Not qualified":
+                errors.append(f"{key}: GO requires scoped candidate, observed result, operator and limits")
             if row.get("blocker"):
                 errors.append(f"{key}: GO cannot retain scope blocker")
         elif require_go:
