@@ -167,7 +167,7 @@ class ArtifactCleanupTests(unittest.TestCase):
             if args == ("api", "repos/DruHustle/onesa-local-ci"):
                 return json.dumps({"full_name": "DruHustle/onesa-local-ci", "id": self.repo_id})
             if args[:2] == ("api", "--paginate"):
-                return "\\n".join(json.dumps(item) for item in (valid, malformed_duplicate))
+                return "\n".join(json.dumps(item) for item in (valid, malformed_duplicate))
             raise AssertionError(args)
 
         with patch.object(cleanup, "gh", side_effect=fake_gh):
