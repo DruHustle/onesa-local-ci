@@ -46,6 +46,27 @@ class RunnerTest(unittest.TestCase):
         with patch.object(boot, 'api', side_effect=self.metadata().__getitem__):
             boot.controller()
 
+    def test_optional_release_gate_cannot_break_or_bypass_workflow_integrity(self):
+        values = self.metadata()
+        workflow = 'portfolio-gates.yml'
+        values['contents/.github/workflows?ref=main'] = [
+            {'name': workflow}, {'name': boot.WORKFLOW}
+        ]
+        key = f'contents/.github/workflows/{workflow}?ref=main'
+        values[key] = {'content': base64.b64encode(
+            boot.reviewed_workflow(workflow).read_bytes()).decode()}
+        # Ordering should not matter, and both checked-out bytes must match.
+        with patch.object(boot, 'api', side_effect=values.__getitem__):
+            boot.controller()
+        # Having a file of an allowed name is not enough: modified content is rejected.
+        values[key] = {'content': base64.b64encode(b'unreviewed: true').decode()}
+        with patch.object(boot, 'api', side_effect=values.__getitem__), self.assertRaises(ValueError):
+            boot.controller()
+        # Never accept unexpected workflows, even if the two reviewed files match.
+        values['contents/.github/workflows?ref=main'].append({'name': 'untrusted.yml'})
+        with patch.object(boot, 'api', side_effect=values.__getitem__), self.assertRaises(ValueError):
+            boot.controller()
+
     def test_owner_without_separate_collaborator_entry_can_configure(self):
         values = self.metadata()
         values['collaborators?per_page=100'] = []
