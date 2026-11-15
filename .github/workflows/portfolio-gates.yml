@@ -1,0 +1,27 @@
+name: Portfolio release matrix
+on:
+  pull_request:
+    paths:
+      - "release/**"
+      - ".github/workflows/portfolio-gates.yml"
+  push:
+    branches: [main]
+    paths:
+      - "release/**"
+      - ".github/workflows/portfolio-gates.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m unittest discover -s release -p 'test_*.py' -v
+      - run: python release/check_portfolio.py release/portfolio-gates-20261115.json
