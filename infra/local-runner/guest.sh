@@ -95,7 +95,7 @@ Group=onesa-ci
 WorkingDirectory=/opt/onesa-actions-runner
 Environment=HOME=/var/lib/onesa-ci
 ExecStart=/opt/onesa-actions-runner/runsvc.sh
-KillMode=process
+KillMode=mixed
 KillSignal=SIGTERM
 TimeoutStopSec=5min
 Restart=always
