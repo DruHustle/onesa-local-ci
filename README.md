@@ -1,5 +1,11 @@
 # onesa-local-ci
-Private workflow controller for trusted Onesa local CI and GitHub-hosted verification.
+Public repository for credential-free GitHub-hosted CI. The historical trusted local-runner workflow is **disabled for public-controller use**: its private-repository condition must not be relaxed, and the Mac self-hosted runner must never be registered to this public repository.
+
+The `Public hosted CI` workflow runs isolated Python regression tests on GitHub-hosted Ubuntu without repository secrets or self-hosted runners.
+
+## Historical local-runner instructions — not authorized on this public repository
+
+**Do not run the bootstrap against this public controller.** It deliberately rejects public visibility. These instructions are retained for reference only and require a separately authorized private controller before use.
 
 ## Set up the local runner
 
