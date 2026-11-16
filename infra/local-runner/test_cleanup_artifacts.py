@@ -273,6 +273,7 @@ class ArtifactCleanupTests(unittest.TestCase):
 
     def test_repository_default_branch_is_never_eligible(self):
         artifact = self.item("ci-old", "2026-09-01T00:00:00Z")
+        artifact["workflow_run"]["head_branch"] = "develop"
         self.assertFalse(cleanup.eligible(artifact, self.now, 14, self.repo_id, "develop"))
         self.assertTrue(cleanup.eligible(artifact, self.now, 14, self.repo_id, "trunk"))
 
