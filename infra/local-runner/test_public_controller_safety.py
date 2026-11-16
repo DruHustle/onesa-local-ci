@@ -16,7 +16,7 @@ class PublicControllerSafetyTests(unittest.TestCase):
     def test_trusted_dispatch_rejects_public_controller(self):
         source = (ROOT / ".github/workflows/trusted-portal.yml").read_text()
         job_blocks = {
-            name: re.search(rf"(?ms)^  {re.escape(name)}:\n(.*?)(?=^  [A-Za-z0-9_-]+:|\\Z)", source)
+            name: re.search(rf"(?ms)^  {re.escape(name)}:\n(.*?)(?=^  [A-Za-z0-9_-]+:|\Z)", source)
             for name in ("local", "hosted-verification")
         }
         for name, match in job_blocks.items():
@@ -29,7 +29,7 @@ class PublicControllerSafetyTests(unittest.TestCase):
         self.assertIn("runs-on: ubuntu-24.04", source)
         self.assertNotIn("runs-on: self-hosted", source)
         self.assertNotIn("runs-on: [self-hosted", source)
-        self.assertIn("permissions:\\n  contents: read", source)
+        self.assertIn("permissions:\n  contents: read", source)
 
 
 if __name__ == "__main__":
