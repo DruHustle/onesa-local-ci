@@ -4,10 +4,12 @@ on:
     branches: [main]
     paths:
       - 'infra/local-runner/**'
+      - '.github/workflows/trusted-portal.yml'
       - '.github/workflows/public-ci.yml'
   pull_request:
     paths:
       - 'infra/local-runner/**'
+      - '.github/workflows/trusted-portal.yml'
       - '.github/workflows/public-ci.yml'
   workflow_dispatch:
 permissions:
