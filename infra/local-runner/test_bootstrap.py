@@ -80,7 +80,7 @@ class RunnerTest(unittest.TestCase):
                 exercise(**kwargs)
 
     def test_only_expected_private_controller_can_register(self):
-        for field, value in [('private', False), ('full_name', 'DruHustle/onesa-company-portal'), ('default_branch', 'dev')]:
+        for field, value in [('private', False), ('full_name', 'DruHustle/onesa-portal'), ('default_branch', 'dev')]:
             with self.subTest(field=field):
                 values = self.metadata()
                 values[''][field] = value
@@ -338,7 +338,7 @@ systemctl() {
         check = compile(textwrap.dedent(section.split('\n  hosted-verification:')[0]), '<receipt>', 'exec')
         sha = 'a' * 40
         run = {'id': 30, 'run_attempt': 2, 'head_sha': sha, 'head_branch': 'main', 'event': 'push',
-               'path': '.github/workflows/verify.yml', 'head_repository': {'full_name': 'DruHustle/onesa-company-portal'},
+               'path': '.github/workflows/verify.yml', 'head_repository': {'full_name': 'DruHustle/onesa-portal'},
                'status': 'completed', 'conclusion': 'success'}
         job = {'name': 'verify', 'labels': ['ubuntu-24.04'], 'status': 'completed', 'conclusion': 'success'}
         with tempfile.TemporaryDirectory() as root:

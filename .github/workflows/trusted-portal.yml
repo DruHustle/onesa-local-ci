@@ -35,7 +35,7 @@ jobs:
           mkdir "$scratch/home"
           git -c core.hooksPath=/dev/null init -q "$scratch/source"
           cd "$scratch/source"
-          git -c credential.helper= -c core.hooksPath=/dev/null fetch --quiet --no-tags --depth=1 https://github.com/DruHustle/onesa-company-portal.git refs/heads/main
+          git -c credential.helper= -c core.hooksPath=/dev/null fetch --quiet --no-tags --depth=1 https://github.com/DruHustle/onesa-portal.git refs/heads/main
           [[ $(git rev-parse FETCH_HEAD) == "$SOURCE_SHA" ]]
           git -c core.hooksPath=/dev/null checkout --quiet --detach "$SOURCE_SHA"
           clean_env=(env -i "HOME=$scratch/home" PATH=/usr/local/bin:/usr/bin:/bin LANG=C.UTF-8)
@@ -49,7 +49,7 @@ jobs:
         run: |
           import json, os, re
           from urllib.request import urlopen
-          repo = 'DruHustle/onesa-company-portal'
+          repo = 'DruHustle/onesa-portal'
           sha = os.environ['SOURCE_SHA']
           assert re.fullmatch('[a-f0-9]{40}', sha)
           def read(path):
@@ -90,7 +90,7 @@ jobs:
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
           git -c core.hooksPath=/dev/null init -q "$RUNNER_TEMP/portal-hosted"
           cd "$RUNNER_TEMP/portal-hosted"
-          git -c credential.helper= fetch --quiet --no-tags --depth=1 https://github.com/DruHustle/onesa-company-portal.git refs/heads/main
+          git -c credential.helper= fetch --quiet --no-tags --depth=1 https://github.com/DruHustle/onesa-portal.git refs/heads/main
           [[ $(git rev-parse FETCH_HEAD) == "$EXPECTED_SHA" ]]
           git -c core.hooksPath=/dev/null checkout --quiet --detach "$EXPECTED_SHA"
           python3 scripts/validate-docs.py

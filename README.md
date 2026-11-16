@@ -24,7 +24,7 @@ The bootstrap checks the controller is private and owner-only, then verifies eve
 ## Verify a reviewed Portal revision
 
 ```sh
-portal_sha=$(git ls-remote https://github.com/DruHustle/onesa-company-portal.git refs/heads/main | cut -f1)
+portal_sha=$(git ls-remote https://github.com/DruHustle/onesa-portal.git refs/heads/main | cut -f1)
 gh workflow run trusted-portal.yml --repo DruHustle/onesa-local-ci --ref main -f source_sha="$portal_sha" -f run_local=true
 gh run list --repo DruHustle/onesa-local-ci --workflow trusted-portal.yml --event workflow_dispatch --limit 5
 ```
