@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -17,6 +18,9 @@ REPO = 'DruHustle/onesa-local-ci'
 VM = 'onesa-portal-local-arm64'
 LABEL = 'onesa-portal-local'
 WORKFLOW = 'trusted-portal.yml'
+# The release gate is a separate, reviewed, GitHub-hosted workflow. Adding it
+# must not prevent verification/resumption of the trusted local runner.
+ALLOWED_WORKFLOWS = frozenset({WORKFLOW, 'portfolio-gates.yml'})
 
 
 def run(*args, data=None, capture=False):
@@ -34,8 +38,9 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def reviewed_workflow():
-    return HERE.parents[1] / '.github/workflows' / WORKFLOW
+def reviewed_workflow(name=WORKFLOW):
+    require(name in ALLOWED_WORKFLOWS, 'Unexpected workflow name.')
+    return HERE.parents[1] / '.github/workflows' / name
 
 
 def controller():
@@ -44,13 +49,55 @@ def controller():
             and metadata.get('default_branch') == 'main' and metadata.get('permissions', {}).get('admin'),
             'The owner-administered private controller with default main is required.')
     collaborators = api('collaborators?per_page=100')
-    require({item['login'] for item in collaborators} <= {REPO.split('/')[0]},
-            'Dedicated controller requires owner-only access.')
+    # GitHub returns at most 100 collaborators per page here. Refuse a
+    # saturated page rather than accepting a potentially partial permission
+    # inventory; this private controller must have owner-only access.
+    require(isinstance(collaborators, list) and len(collaborators) < 100
+            and all(isinstance(item, dict) and item.get('login') == REPO.split('/')[0]
+                    for item in collaborators),
+            'Dedicated controller requires a complete owner-only collaborator inventory.')
     entries = api('contents/.github/workflows?ref=main')
-    require([entry['name'] for entry in entries] == [WORKFLOW], 'Unexpected private controller workflows.')
-    content = api(f'contents/.github/workflows/{WORKFLOW}?ref=main')
-    require(base64.b64decode(content['content']) == reviewed_workflow().read_bytes(),
-            'The active controller workflow differs from this reviewed bootstrap.')
+    require(isinstance(entries, list) and len(entries) < 1000
+            and all(isinstance(entry, dict) for entry in entries),
+            'Unexpected or incomplete private controller workflow listing.')
+    names = [entry.get('name') for entry in entries]
+    require(len(names) == len(set(names)) and WORKFLOW in names
+            and set(names) <= ALLOWED_WORKFLOWS,
+            'Unexpected private controller workflows.')
+    # Check *every* active workflow against this same checkout. Otherwise an
+    # added release-gate workflow either blocks local runner resumption or can
+    # escape the original single-file integrity check.
+    for name in sorted(names):
+        content = api(f'contents/.github/workflows/{name}?ref=main')
+        require(base64.b64decode(content['content']) == reviewed_workflow(name).read_bytes(),
+                f'The active {name} workflow differs from this reviewed checkout.')
+
+
+def trusted_checkout():
+    """Only run privileged bootstrap code from the clean, exact owner main checkout."""
+    root = HERE.parents[1].resolve()
+    top = run('git', '-C', str(root), 'rev-parse', '--show-toplevel', capture=True).decode().strip()
+    require(Path(top).resolve() == root, 'Run bootstrap from the canonical repository checkout.')
+    origin = run('git', '-C', str(root), 'remote', 'get-url', 'origin', capture=True).decode().strip()
+    normalized_origin = origin.removesuffix('.git').rstrip('/')
+    require(normalized_origin in (
+        f'https://github.com/{REPO}', f'git@github.com:{REPO}'
+    ), 'Checkout origin must be the canonical private controller repository.')
+    dirty = run('git', '-C', str(root), 'status', '--porcelain', '--untracked-files=all',
+                capture=True).decode()
+    require(not dirty.strip(), 'Refusing to execute modified or untracked local controller code.')
+    local_sha = run('git', '-C', str(root), 'rev-parse', 'HEAD', capture=True).decode().strip()
+    remote = api('commits/main')
+    remote_sha = remote.get('sha') if isinstance(remote, dict) else None
+    require(isinstance(remote_sha, str) and re.fullmatch(r'[0-9a-f]{40}', remote_sha)
+            and local_sha == remote_sha,
+            'Checkout must be the exact current owner-reviewed main commit.')
+    # Read the guest script from the verified Git object, not from the working
+    # tree after VM provisioning, to close the edit-between-check-and-use gap.
+    script = run('git', '-C', str(root), 'show', 'HEAD:infra/local-runner/guest.sh', capture=True)
+    require(isinstance(script, bytes) and script.startswith(b'#!/usr/bin/env bash'),
+            'Verified main does not contain the expected guest setup script.')
+    return script
 
 
 def instances():
@@ -82,10 +129,11 @@ def guest(*args, **kwargs):
     return run('limactl', 'shell', '--tty=false', '--workdir=/', VM, *args, **kwargs)
 
 
-def stage_guest_setup():
+def stage_guest_setup(script):
     # A non-PTY SSH session may deliver stdin through a socket. Read the open descriptor directly.
+    require(isinstance(script, bytes) and script, 'Verified guest setup script bytes are required.')
     guest('sudo', 'sh', '-c', 'umask 077; cat > "$1" && chmod 0700 "$1"', 'sh', '/run/onesa-ci-bootstrap',
-          data=(HERE / 'guest.sh').read_bytes())
+          data=script)
 
 
 def remote_runner():
@@ -101,6 +149,7 @@ def configure():
     require(shutil.which('gh') and shutil.which('limactl'), 'Install GitHub CLI and Lima on this Mac first.')
     require(os.geteuid() != 0, 'Run as the signed-in macOS user.')
     controller()
+    guest_script = trusted_checkout()
     state = Path.home() / 'Library/Application Support/Onesa/local-ci'
     state.mkdir(mode=0o700, parents=True, exist_ok=True)
     with (state / 'setup.lock').open('a') as lock:
@@ -116,7 +165,7 @@ def configure():
                     'Local and GitHub registration disagree. Inspect the existing runner before proceeding.')
         else:
             require(not remote, 'The name is already registered to another or missing guest.')
-        stage_guest_setup()
+        stage_guest_setup(guest_script)
         token = b'' if local else api('actions/runners/registration-token', 'POST')['token'].encode() + b'\n'
         guest('sudo', 'bash', '/run/onesa-ci-bootstrap', data=token)
         run('limactl', 'start-at-login', VM)

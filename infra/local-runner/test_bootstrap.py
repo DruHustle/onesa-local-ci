@@ -26,6 +26,59 @@ class RunnerTest(unittest.TestCase):
                 f'contents/.github/workflows/{boot.WORKFLOW}?ref=main': {
                     'content': base64.b64encode(boot.reviewed_workflow().read_bytes()).decode()}}
 
+    def test_release_gate_runs_for_operator_policy_files(self):
+        workflow = (HERE.parents[1] / ".github/workflows/portfolio-gates.yml").read_text()
+        for path in ("README.md", "AGENTS.md", ".gitignore"):
+            with self.subTest(path=path):
+                self.assertEqual(workflow.count(f'      - "{path}"'), 2)
+
+    def test_generated_python_bytecode_is_ignored(self):
+        root = boot.HERE.parents[1]
+        for path in (
+            "infra/local-runner/__pycache__/bootstrap.cpython-311.pyc",
+            "release/__pycache__/check_portfolio.cpython-311.pyc",
+        ):
+            result = subprocess.run(
+                ["git", "-C", str(root), "check-ignore", "--no-index", path],
+                capture_output=True, text=True, check=False
+            )
+            self.assertEqual(result.returncode, 0, path)
+
+    def test_bootstrap_requires_clean_canonical_exact_main_checkout(self):
+        root = boot.HERE.parents[1].resolve()
+        good_sha = "a" * 40
+
+        def exercise(status="", head=good_sha, origin="https://github.com/DruHustle/onesa-local-ci.git",
+                     top=None, remote_sha=good_sha):
+            def fake_run(*args, **kwargs):
+                command = args[3:]
+                if command == ("rev-parse", "--show-toplevel"):
+                    return str(top or root).encode()
+                if command == ("remote", "get-url", "origin"):
+                    return origin.encode()
+                if command == ("status", "--porcelain", "--untracked-files=all"):
+                    return status.encode()
+                if command == ("rev-parse", "HEAD"):
+                    return head.encode()
+                if command == ("show", "HEAD:infra/local-runner/guest.sh"):
+                    return b"#!/usr/bin/env bash\\nset -euo pipefail\\n"
+                raise AssertionError(args)
+            with patch.object(boot, "run", side_effect=fake_run), \
+                 patch.object(boot, "api", return_value={"sha": remote_sha}):
+                return boot.trusted_checkout()
+
+        self.assertEqual(exercise(), b"#!/usr/bin/env bash\\nset -euo pipefail\\n")
+        for kwargs in (
+            {"status": " M infra/local-runner/guest.sh"},
+            {"status": "?? untracked.py"},
+            {"head": "b" * 40},
+            {"origin": "https://github.com/DruHustle/onesa-company-portal.git"},
+            {"top": root / "nested"},
+            {"remote_sha": "not-a-full-commit"},
+        ):
+            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                exercise(**kwargs)
+
     def test_only_expected_private_controller_can_register(self):
         for field, value in [('private', False), ('full_name', 'DruHustle/onesa-company-portal'), ('default_branch', 'dev')]:
             with self.subTest(field=field):
@@ -46,6 +99,40 @@ class RunnerTest(unittest.TestCase):
         with patch.object(boot, 'api', side_effect=self.metadata().__getitem__):
             boot.controller()
 
+    def test_optional_release_gate_cannot_break_or_bypass_workflow_integrity(self):
+        values = self.metadata()
+        workflow = 'portfolio-gates.yml'
+        values['contents/.github/workflows?ref=main'] = [
+            {'name': workflow}, {'name': boot.WORKFLOW}
+        ]
+        key = f'contents/.github/workflows/{workflow}?ref=main'
+        values[key] = {'content': base64.b64encode(
+            boot.reviewed_workflow(workflow).read_bytes()).decode()}
+        # Ordering should not matter, and both checked-out bytes must match.
+        with patch.object(boot, 'api', side_effect=values.__getitem__):
+            boot.controller()
+        # Having a file of an allowed name is not enough: modified content is rejected.
+        values[key] = {'content': base64.b64encode(b'unreviewed: true').decode()}
+        with patch.object(boot, 'api', side_effect=values.__getitem__), self.assertRaises(ValueError):
+            boot.controller()
+        # Never accept unexpected workflows, even if the two reviewed files match.
+        values['contents/.github/workflows?ref=main'].append({'name': 'untrusted.yml'})
+        with patch.object(boot, 'api', side_effect=values.__getitem__), self.assertRaises(ValueError):
+            boot.controller()
+
+    def test_truncated_or_malformed_controller_inventory_is_rejected(self):
+        for collaborators in ([{'login': 'DruHustle'}] * 100, {'login': 'DruHustle'},
+                              [None], [{'login': None}]):
+            with self.subTest(collaborators=collaborators):
+                values = self.metadata()
+                values['collaborators?per_page=100'] = collaborators
+                with patch.object(boot, 'api', side_effect=values.__getitem__), self.assertRaises(ValueError):
+                    boot.controller()
+        values = self.metadata()
+        values['contents/.github/workflows?ref=main'] = [{'name': boot.WORKFLOW}] * 1000
+        with patch.object(boot, 'api', side_effect=values.__getitem__), self.assertRaises(ValueError):
+            boot.controller()
+
     def test_owner_without_separate_collaborator_entry_can_configure(self):
         values = self.metadata()
         values['collaborators?per_page=100'] = []
@@ -64,6 +151,7 @@ class RunnerTest(unittest.TestCase):
                 patch.object(boot.platform, 'machine', return_value='arm64'), \
                 patch.object(boot.shutil, 'which', return_value='/bin/tool'), \
                 patch.object(boot.os, 'geteuid', return_value=501), patch.object(boot, 'controller'), \
+                patch.object(boot, 'trusted_checkout', return_value=(boot.HERE / 'guest.sh').read_bytes()), \
                 patch.object(boot, 'provision_vm'), patch('builtins.print'), \
                 patch.object(boot, 'guest', side_effect=[b'', None, interrupted_setup, configured, None, None]) as guest, \
                 patch.object(boot, 'remote_runner', side_effect=[None, offline, registered]), \
@@ -100,8 +188,20 @@ class RunnerTest(unittest.TestCase):
         guest = guest.replace('unit=/etc/systemd/system/onesa-local-ci.service', 'unit="$fixture/unit"')
         guest = guest.replace('/usr/local/bin/onesa-ci-node', '"$fixture/onesa-ci-node"')
         commands = '''set -eu
-getent() { return 0; }
-id() { echo onesa-ci; }
+getent() {
+  if [[ $1 == passwd && $2 == onesa-ci ]]; then
+    echo 'onesa-ci:x:999:999::/var/lib/onesa-ci:/usr/sbin/nologin'
+    return 0
+  fi
+  return 1
+}
+id() {
+  case "$1" in
+    -u) echo 999;;
+    -gn|-nG) echo onesa-ci;;
+    *) return 1;;
+  esac
+}
 apt-get() { echo 'Unexpected reinstall' >&2; exit 1; }
 runuser() { [[ $1 == -u && $2 == onesa-ci && $3 == -- ]]; shift 3; "$@"; }
 systemctl() {
@@ -143,7 +243,7 @@ systemctl() {
                     self.assertEqual((work / 'runsvc.sh').read_bytes(), vendor_wrapper.read_bytes())
                     self.assertEqual((work / 'runsvc.sh').stat().st_mode & 0o777, 0o755)
                     for directive in ['WorkingDirectory=/opt/onesa-actions-runner',
-                                      'ExecStart=/opt/onesa-actions-runner/runsvc.sh', 'KillMode=process',
+                                      'ExecStart=/opt/onesa-actions-runner/runsvc.sh', 'KillMode=mixed',
                                       'KillSignal=SIGTERM', 'TimeoutStopSec=5min']:
                         self.assertIn(directive, unit.read_text().splitlines())
 
@@ -202,9 +302,21 @@ systemctl() {
                             subprocess.run(command, stdin=receiver, check=True)
 
                 with patch.object(boot, 'guest', side_effect=simulate_guest):
-                    boot.stage_guest_setup()
+                    boot.stage_guest_setup(source)
                 self.assertEqual(target.read_bytes(), source)
                 self.assertEqual(target.stat().st_mode & 0o777, 0o700)
+
+    def test_release_gate_validates_all_maintained_runner_modules(self):
+        workflow = boot.reviewed_workflow('portfolio-gates.yml').read_text()
+        self.assertIn('"infra/local-runner/**"', workflow)
+        self.assertIn('".github/workflows/**"', workflow)
+        self.assertIn("-p 'test_*.py' -v", workflow)
+        self.assertIn("python -m unittest discover -s infra/local-runner", workflow)
+
+    def test_service_uses_mixed_kill_mode_to_reap_orphaned_job_processes(self):
+        setup = (HERE / "guest.sh").read_text()
+        self.assertIn("KillMode=mixed", setup)
+        self.assertNotIn("KillMode=process", setup)
 
     def test_service_setup_shell_and_workflow_contract(self):
         subprocess.run(['bash', '-n', str(HERE / 'guest.sh')], check=True)
@@ -245,6 +357,50 @@ systemctl() {
                         else:
                             with self.assertRaises(SystemExit):
                                 exec(check, {})
+
+
+    def test_guest_rejects_root_or_misconfigured_runner_accounts(self):
+        setup = (HERE / 'guest.sh').read_text()
+        body = setup.split('validate_runner_account() {', 1)[1].split(chr(10) + '}', 1)[0]
+        function = 'validate_runner_account() {' + body + chr(10) + '}'
+        harness = function + '''
+getent() { [[ $1 == passwd && $2 == onesa-ci ]] || return 1; printf '%s' "$ACCOUNT_RECORD"; }
+id() {
+  case "$1" in
+    -u) printf '%s' "$ACCOUNT_UID";;
+    -gn) printf '%s' "$ACCOUNT_GROUP";;
+    -nG) printf '%s' "$ACCOUNT_GROUPS";;
+    *) return 1;;
+  esac
+}
+validate_runner_account onesa-ci
+'''
+        good = 'onesa-ci:x:999:999::/var/lib/onesa-ci:/usr/sbin/nologin'
+        cases = [
+            (good, '999', 'onesa-ci', 'onesa-ci', True),
+            ('onesa-ci:x:0:999::/var/lib/onesa-ci:/usr/sbin/nologin', '0', 'onesa-ci', 'onesa-ci', False),
+            ('onesa-ci:x:999:0::/var/lib/onesa-ci:/usr/sbin/nologin', '999', 'root', 'onesa-ci root', False),
+            (good, '999', 'onesa-ci', 'onesa-ci sudo', False),
+            ('onesa-ci:x:999:999::/home/onesa-ci:/usr/sbin/nologin', '999', 'onesa-ci', 'onesa-ci', False),
+            ('onesa-ci:x:999:999::/var/lib/onesa-ci:/bin/bash', '999', 'onesa-ci', 'onesa-ci', False),
+        ]
+        for record, uid, group, groups, expected in cases:
+            with self.subTest(record=record, groups=groups):
+                env = {**os.environ, 'ACCOUNT_RECORD': record, 'ACCOUNT_UID': uid,
+                       'ACCOUNT_GROUP': group, 'ACCOUNT_GROUPS': groups}
+                result = subprocess.run(['bash', '-c', harness], env=env, capture_output=True)
+                self.assertEqual(result.returncode == 0, expected, result.stderr)
+
+    def test_all_external_workflow_actions_are_pinned_to_full_commit_shas(self):
+        for name in ('portfolio-gates.yml', boot.WORKFLOW):
+            with self.subTest(workflow=name):
+                for line in boot.reviewed_workflow(name).read_text().splitlines():
+                    stripped = line.strip()
+                    if stripped.startswith('uses:'):
+                        ref = stripped.split('@', 1)[1]
+                        self.assertEqual(len(ref), 40)
+                        self.assertTrue(all(char in '0123456789abcdef' for char in ref),
+                                        f'{name} must pin third-party actions to immutable commit SHAs')
 
 
 if __name__ == '__main__':
