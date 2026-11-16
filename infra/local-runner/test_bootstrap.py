@@ -26,6 +26,59 @@ class RunnerTest(unittest.TestCase):
                 f'contents/.github/workflows/{boot.WORKFLOW}?ref=main': {
                     'content': base64.b64encode(boot.reviewed_workflow().read_bytes()).decode()}}
 
+    def test_release_gate_runs_for_operator_policy_files(self):
+        workflow = (HERE.parents[1] / ".github/workflows/portfolio-gates.yml").read_text()
+        for path in ("README.md", "AGENTS.md", ".gitignore"):
+            with self.subTest(path=path):
+                self.assertEqual(workflow.count(f'      - "{path}"'), 2)
+
+    def test_generated_python_bytecode_is_ignored(self):
+        root = boot.HERE.parents[1]
+        for path in (
+            "infra/local-runner/__pycache__/bootstrap.cpython-311.pyc",
+            "release/__pycache__/check_portfolio.cpython-311.pyc",
+        ):
+            result = subprocess.run(
+                ["git", "-C", str(root), "check-ignore", "--no-index", path],
+                capture_output=True, text=True, check=False
+            )
+            self.assertEqual(result.returncode, 0, path)
+
+    def test_bootstrap_requires_clean_canonical_exact_main_checkout(self):
+        root = boot.HERE.parents[1].resolve()
+        good_sha = "a" * 40
+
+        def exercise(status="", head=good_sha, origin="https://github.com/DruHustle/onesa-local-ci.git",
+                     top=None, remote_sha=good_sha):
+            def fake_run(*args, **kwargs):
+                command = args[3:]
+                if command == ("rev-parse", "--show-toplevel"):
+                    return str(top or root).encode()
+                if command == ("remote", "get-url", "origin"):
+                    return origin.encode()
+                if command == ("status", "--porcelain", "--untracked-files=all"):
+                    return status.encode()
+                if command == ("rev-parse", "HEAD"):
+                    return head.encode()
+                if command == ("show", "HEAD:infra/local-runner/guest.sh"):
+                    return b"#!/usr/bin/env bash\\nset -euo pipefail\\n"
+                raise AssertionError(args)
+            with patch.object(boot, "run", side_effect=fake_run), \
+                 patch.object(boot, "api", return_value={"sha": remote_sha}):
+                return boot.trusted_checkout()
+
+        self.assertEqual(exercise(), b"#!/usr/bin/env bash\\nset -euo pipefail\\n")
+        for kwargs in (
+            {"status": " M infra/local-runner/guest.sh"},
+            {"status": "?? untracked.py"},
+            {"head": "b" * 40},
+            {"origin": "https://github.com/DruHustle/onesa-company-portal.git"},
+            {"top": root / "nested"},
+            {"remote_sha": "not-a-full-commit"},
+        ):
+            with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
+                exercise(**kwargs)
+
     def test_only_expected_private_controller_can_register(self):
         for field, value in [('private', False), ('full_name', 'DruHustle/onesa-company-portal'), ('default_branch', 'dev')]:
             with self.subTest(field=field):
@@ -98,6 +151,7 @@ class RunnerTest(unittest.TestCase):
                 patch.object(boot.platform, 'machine', return_value='arm64'), \
                 patch.object(boot.shutil, 'which', return_value='/bin/tool'), \
                 patch.object(boot.os, 'geteuid', return_value=501), patch.object(boot, 'controller'), \
+                patch.object(boot, 'trusted_checkout', return_value=(boot.HERE / 'guest.sh').read_bytes()), \
                 patch.object(boot, 'provision_vm'), patch('builtins.print'), \
                 patch.object(boot, 'guest', side_effect=[b'', None, interrupted_setup, configured, None, None]) as guest, \
                 patch.object(boot, 'remote_runner', side_effect=[None, offline, registered]), \
@@ -248,7 +302,7 @@ systemctl() {
                             subprocess.run(command, stdin=receiver, check=True)
 
                 with patch.object(boot, 'guest', side_effect=simulate_guest):
-                    boot.stage_guest_setup()
+                    boot.stage_guest_setup(source)
                 self.assertEqual(target.read_bytes(), source)
                 self.assertEqual(target.stat().st_mode & 0o777, 0o700)
 
