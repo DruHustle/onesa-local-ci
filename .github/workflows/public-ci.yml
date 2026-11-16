@@ -1,0 +1,26 @@
+name: Public hosted CI
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/local-runner/**'
+      - '.github/workflows/public-ci.yml'
+  pull_request:
+    paths:
+      - 'infra/local-runner/**'
+      - '.github/workflows/public-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  runner-regression:
+    name: runner-regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout untrusted source without persisted credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Run isolated runner configuration regression tests
+        run: python3 -m unittest discover -s infra/local-runner -p 'test_*.py' -v
