@@ -40,6 +40,28 @@ After suspected execution of untrusted code, take the runner offline and replace
 registration and guest before trusting it again. Do not place production credentials
 or unrelated deployment secrets in this guest.
 
+
+## Release evidence policy
+
+A source commit URL plus a successful workflow-run URL is not sufficient by itself to
+approve a product launch. The release verifier also checks the exact run attempt and
+the required acceptance job inventory for that attempt.
+
+Before any product can be marked GO, an owner must independently review that source
+repository's acceptance contract and populate its exact workflow path and required
+job name in `APPROVED_SOURCE_WORKFLOWS` and `APPROVED_SOURCE_JOBS` in
+`release/check_portfolio.py`. These are code-reviewed allowlists, not values copied
+from a release-matrix row or supplied by the evidence URL. They are intentionally
+empty until that review occurs, so every product remains fail-closed rather than
+accepting an arbitrary workflow under `.github/workflows/`.
+
+The verifier reads public GitHub Actions run and attempt-job metadata without
+credentials. Private source repositories, incomplete job inventories, missing jobs,
+skipped/failed jobs, unreviewed workflow paths and unavailable API responses cannot
+qualify as GO. Do not add production credentials to work around inaccessible evidence;
+use a separately approved least-privilege read-only evidence mechanism if private
+source evidence is later required.
+
 ## Stop and resume
 
 ```sh
