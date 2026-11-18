@@ -62,6 +62,27 @@ class PortfolioGateTests(unittest.TestCase):
             "https://github.com/DruHustle/onesa-documents/actions/runs/123",
         ]))
 
+    def test_all_eight_products_use_only_canonical_production_web_hosts(self):
+        reviewed = {
+            "smart-farmer": "farmer.onesa.eu",
+            "smart-logistics": "logistics.onesa.eu",
+            "smart-factory": "factory.onesa.eu",
+            "onesa-ai-platform": "platform.onesa.eu",
+            "onesa-drone": "drone.onesa.eu",
+            "onesa-robot": "robot.onesa.eu",
+            "onesa-mobile": "mobile.onesa.eu",
+            "pasofi": "pasofi.mobile.onesa.eu",
+        }
+        for product, host in reviewed.items():
+            with self.subTest(product=product):
+                self.assertTrue(valid_production_web_url(product, "https://" + host))
+                self.assertFalse(valid_production_web_url(product, "https://" + host + ".invalid"))
+                self.assertFalse(valid_production_web_url(product, "https://" + host + ":8443"))
+                self.assertFalse(valid_production_web_url(product,
+                                 "https://" + product + "-preview.vercel.app"))
+        self.assertFalse(valid_production_web_url("onesa-robot", "https://drone.onesa.eu"))
+        self.assertFalse(valid_production_web_url("smart-farmer", "https://portal.onesa.eu"))
+
     def test_identity_go_uses_account_application_not_auth0_issuer(self):
         self.assertTrue(valid_production_web_url("identity", "https://account.onesa.eu"))
         self.assertTrue(valid_production_web_url("identity", "https://account.onesa.eu/readyz"))
