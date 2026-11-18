@@ -8,7 +8,6 @@ import argparse
 import hashlib
 import json
 import platform
-import re
 import shutil
 import subprocess
 import sys
@@ -48,7 +47,10 @@ def add(report, name, ok, detail):
 def parse_utc(value):
     if not isinstance(value, str):
         raise ValueError("Missing GitHub timestamp")
-    return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+    timestamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if timestamp.tzinfo is None:
+        raise ValueError("GitHub timestamp must contain a timezone")
+    return timestamp.astimezone(timezone.utc)
 
 
 def verify_dispatch(run, jobs, *, now=None):
@@ -145,6 +147,7 @@ def probe(run_id=None):
         add(report, "github_online", False, "GitHub CLI unavailable")
 
     vm = None
+    owned = False
     if has_lima and is_mac:
         try:
             instances = [json.loads(line) for line in command("limactl", "list", "--json").splitlines() if line]
@@ -157,7 +160,8 @@ def probe(run_id=None):
                      and not vm.get("additionalDisks"))
             marker = Path.home() / "Library/Application Support/Onesa/local-ci/guest.sha256"
             actual = hashlib.sha256((Path(vm["dir"]) / "lima.yaml").read_bytes()).hexdigest()
-            add(report, "owned_guest", shape and marker.is_file() and marker.read_text().strip() == actual,
+            owned = bool(shape and marker.is_file() and marker.read_text().strip() == actual)
+            add(report, "owned_guest", owned,
                 "Guest resources and pinned Lima definition must match")
             add(report, "guest_running", vm.get("status") == "Running",
                 "Dedicated Lima guest must be running")
@@ -169,7 +173,7 @@ def probe(run_id=None):
         add(report, "owned_guest", False, "Requires the intended Mac and Lima")
         add(report, "guest_running", False, "Requires the intended Mac and Lima")
 
-    if vm is not None and vm.get("status") == "Running":
+    if owned and vm is not None and vm.get("status") == "Running":
         try:
             guest("sudo", "systemctl", "is-active", "--quiet", SERVICE)
             guest("sudo", "systemctl", "is-enabled", "--quiet", SERVICE)
