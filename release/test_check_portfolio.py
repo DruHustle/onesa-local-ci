@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 from release.check_portfolio import (APPROVED_SOURCE_JOBS, APPROVED_SOURCE_WORKFLOWS,
-                                     SOURCE_REPOSITORIES, validate, verify_source_runs)
+                                     SOURCE_REPOSITORIES, has_source_bound_evidence, validate, verify_source_runs)
 
 MATRIX = Path(__file__).with_name("portfolio-gates-20261115.json")
 
@@ -39,13 +39,27 @@ class PortfolioGateTests(unittest.TestCase):
             "onesa-drone": "onesa-drone", "onesa-robot": "onesa-robot",
             "smart-farmer": "smart-farmer", "smart-logistics": "smart-logistics",
             "smart-factory": "smart-factory", "onesa-ai-platform": "onesa-ai-platform",
-            "company-portal": "onesa-company-portal",
+            "company-portal": "onesa-portal",
             "documents-public": "onesa-documents", "documents-internal": "onesa-documents",
             "identity": "onesa-identity",
         }
         repository = repositories[product]
         base = f"https://github.com/DruHustle/{repository}"
         return [f"{base}/commit/{sha}", f"{base}/actions/runs/123"]
+
+    def test_company_portal_release_evidence_uses_canonical_repository(self):
+        sha = "a" * 40
+        self.assertEqual(SOURCE_REPOSITORIES["company-portal"], "onesa-portal")
+        evidence = self.evidence_for("company-portal", sha)
+        self.assertTrue(has_source_bound_evidence("company-portal", sha, evidence))
+        self.assertFalse(has_source_bound_evidence("company-portal", sha, [
+            f"https://github.com/DruHustle/onesa-company-portal/commit/{sha}",
+            "https://github.com/DruHustle/onesa-company-portal/actions/runs/123",
+        ]))
+        self.assertFalse(has_source_bound_evidence("company-portal", sha, [
+            f"https://github.com/DruHustle/onesa-portal/commit/{sha}",
+            "https://github.com/DruHustle/onesa-documents/actions/runs/123",
+        ]))
 
     def test_all_28_client_rows_are_present(self):
         self.assertEqual(len(self.document["entries"]), 28)
