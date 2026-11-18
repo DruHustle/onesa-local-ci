@@ -42,7 +42,7 @@ class PortfolioGateTests(unittest.TestCase):
             "smart-factory": "smart-factory", "onesa-ai-platform": "onesa-ai-platform",
             "company-portal": "onesa-portal",
             "documents-public": "onesa-documents", "documents-internal": "onesa-documents",
-            "identity": "onesa-identity",
+            "identity": "onesa-identity", "onesa-security": "onesa-security",
         }
         repository = repositories[product]
         base = f"https://github.com/DruHustle/{repository}"
@@ -94,12 +94,27 @@ class PortfolioGateTests(unittest.TestCase):
             "https://account.onesa.eu",
         )
 
-    def test_all_28_client_rows_are_present(self):
-        self.assertEqual(len(self.document["entries"]), 28)
+    def test_security_web_is_separate_from_issuer_and_requires_real_source(self):
+        self.assertEqual(SOURCE_REPOSITORIES["onesa-security"], "onesa-security")
+        self.assertTrue(valid_production_web_url("onesa-security", "https://security.onesa.eu"))
+        self.assertFalse(valid_production_web_url("onesa-security", "https://security-api.onesa.eu"))
+        self.assertFalse(valid_production_web_url("onesa-security", "https://auth.onesa.eu"))
+        self.assertFalse(valid_production_web_url("onesa-security", "https://security-preview.vercel.app"))
+        row = next(x for x in self.document["entries"] if x["product"] == "onesa-security")
+        self.assertEqual(row["platform"], "web")
+        self.assertEqual(row["decision"], "NO-GO")
+        sha = "c" * 40
+        self.assertTrue(has_source_bound_evidence("onesa-security", sha,
+            self.evidence_for("onesa-security", sha)))
+        self.assertFalse(has_source_bound_evidence("onesa-security", sha,
+            self.evidence_for("onesa-robot", sha)))
+
+    def test_all_29_client_rows_are_present(self):
+        self.assertEqual(len(self.document["entries"]), 29)
         self.assertEqual(validate(self.document), [])
 
     def test_incomplete_portfolio_cannot_launch(self):
-        self.assertEqual(len(validate(self.document, require_go=True)), 43)
+        self.assertEqual(len(validate(self.document, require_go=True)), 44)
 
     def test_all_fifteen_scope_gates_are_present(self):
         self.assertEqual(len(self.document["scope_gates"]), 15)

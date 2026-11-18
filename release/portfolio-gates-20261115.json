@@ -528,6 +528,22 @@
       "observed_result": "Not tested on the release candidate",
       "support_owner": "identity",
       "operating_limits": "Not qualified"
+    },
+    {
+      "product": "onesa-security",
+      "platform": "web",
+      "owner": "security",
+      "decision": "NO-GO",
+      "candidate": "",
+      "release_url": "https://security.onesa.eu",
+      "workflow": "Onesa Security OIDC sign-in, tenant and role isolation, API readiness, AI guardrails and security workflow",
+      "evidence": [],
+      "blocker": "Web alias READY on Vercel does not qualify the API: security-api.onesa.eu DNS, protected OIDC tenant session, mTLS collector, PostgreSQL force-RLS, audit and operator workflows have no observed production acceptance",
+      "environment": "production (unverified)",
+      "role_tested": "",
+      "observed_result": "Not tested on the release candidate",
+      "support_owner": "security",
+      "operating_limits": "Not qualified"
     }
   ],
   "scope_gates": [
