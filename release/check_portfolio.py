@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate all 28 Onesa client release decisions; never infer GO from a build."""
+"""Validate all 29 Onesa client release decisions; never infer GO from a build."""
 import argparse
 import json
 from pathlib import Path
@@ -11,7 +11,7 @@ PRODUCTS = (
     "onesa-mobile", "pasofi", "onesa-drone", "onesa-robot",
     "smart-farmer", "smart-logistics", "smart-factory", "onesa-ai-platform",
 )
-WEB_ONLY = ("company-portal", "documents-public", "documents-internal", "identity")
+WEB_ONLY = ("company-portal", "documents-public", "documents-internal", "identity", "onesa-security")
 EXPECTED = {(p, c) for p in PRODUCTS for c in ("web", "ios", "android")}
 EXPECTED |= {(p, "web") for p in WEB_ONLY}
 
@@ -28,6 +28,7 @@ SOURCE_REPOSITORIES = {
     "documents-public": "onesa-documents",
     "documents-internal": "onesa-documents",
     "identity": "onesa-identity",
+    "onesa-security": "onesa-security",
 }
 
 # A source run is not acceptance merely because its workflow file is under
@@ -54,6 +55,7 @@ PRODUCTION_WEB_HOSTS = {
     # auth.onesa.eu is the DNS-only Auth0 issuer, not the protected Onesa
     # Account application. Its availability cannot qualify the Identity UI.
     "identity": frozenset({"account.onesa.eu"}),
+    "onesa-security": frozenset({"security.onesa.eu"}),
 }
 
 
@@ -506,7 +508,7 @@ def main():
         for error in errors:
             print("FAIL:", error)
         raise SystemExit(1)
-    print("PASS: complete 28-client inventory and evidence gates")
+    print("PASS: complete 29-client inventory and evidence gates")
 
 
 if __name__ == "__main__":
