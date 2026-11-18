@@ -24,7 +24,7 @@ SOURCE_REPOSITORIES = {
     "smart-logistics": "smart-logistics",
     "smart-factory": "smart-factory",
     "onesa-ai-platform": "onesa-ai-platform",
-    "company-portal": "onesa-company-portal",
+    "company-portal": "onesa-portal",
     "documents-public": "onesa-documents",
     "documents-internal": "onesa-documents",
     "identity": "onesa-identity",
