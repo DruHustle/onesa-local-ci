@@ -115,7 +115,7 @@ class RunnerDoctorTests(unittest.TestCase):
 
     def test_health_check_never_dispatches_or_mutates_runner_registration(self):
         source = (HERE / "doctor.py").read_text()
-        self.assertNotIn("workflow run ", source)
+        self.assertNotIn('"gh", "workflow", "run"', source)
         self.assertNotIn('"POST"', source)
         self.assertNotIn("registration-token", source)
         self.assertNotIn("provision_vm(", source)
