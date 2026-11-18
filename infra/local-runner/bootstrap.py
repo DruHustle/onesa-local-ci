@@ -18,9 +18,9 @@ REPO = 'DruHustle/onesa-local-ci'
 VM = 'onesa-portal-local-arm64'
 LABEL = 'onesa-portal-local'
 WORKFLOW = 'trusted-portal.yml'
-# The release gate is a separate, reviewed, GitHub-hosted workflow. Adding it
-# must not prevent verification/resumption of the trusted local runner.
-ALLOWED_WORKFLOWS = frozenset({WORKFLOW, 'portfolio-gates.yml'})
+# The hosted regression and release-gate workflows are separately reviewed.
+# Their presence must not prevent private-controller runner resumption.
+ALLOWED_WORKFLOWS = frozenset({WORKFLOW, 'portfolio-gates.yml', 'public-ci.yml'})
 
 
 def run(*args, data=None, capture=False):

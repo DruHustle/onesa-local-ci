@@ -99,26 +99,29 @@ class RunnerTest(unittest.TestCase):
         with patch.object(boot, 'api', side_effect=self.metadata().__getitem__):
             boot.controller()
 
-    def test_optional_release_gate_cannot_break_or_bypass_workflow_integrity(self):
-        values = self.metadata()
-        workflow = 'portfolio-gates.yml'
-        values['contents/.github/workflows?ref=main'] = [
-            {'name': workflow}, {'name': boot.WORKFLOW}
-        ]
-        key = f'contents/.github/workflows/{workflow}?ref=main'
-        values[key] = {'content': base64.b64encode(
-            boot.reviewed_workflow(workflow).read_bytes()).decode()}
-        # Ordering should not matter, and both checked-out bytes must match.
-        with patch.object(boot, 'api', side_effect=values.__getitem__):
-            boot.controller()
-        # Having a file of an allowed name is not enough: modified content is rejected.
-        values[key] = {'content': base64.b64encode(b'unreviewed: true').decode()}
-        with patch.object(boot, 'api', side_effect=values.__getitem__), self.assertRaises(ValueError):
-            boot.controller()
-        # Never accept unexpected workflows, even if the two reviewed files match.
-        values['contents/.github/workflows?ref=main'].append({'name': 'untrusted.yml'})
-        with patch.object(boot, 'api', side_effect=values.__getitem__), self.assertRaises(ValueError):
-            boot.controller()
+    def test_reviewed_hosted_workflows_cannot_break_or_bypass_integrity(self):
+        for workflow in ('portfolio-gates.yml', 'public-ci.yml'):
+            with self.subTest(workflow=workflow):
+                values = self.metadata()
+                values['contents/.github/workflows?ref=main'] = [
+                    {'name': workflow}, {'name': boot.WORKFLOW}
+                ]
+                key = f'contents/.github/workflows/{workflow}?ref=main'
+                values[key] = {'content': base64.b64encode(
+                    boot.reviewed_workflow(workflow).read_bytes()).decode()}
+                # Every approved workflow is verified byte-for-byte against this checkout.
+                with patch.object(boot, 'api', side_effect=values.__getitem__):
+                    boot.controller()
+                # An allowed filename is not sufficient; modified bytes fail closed.
+                values[key] = {'content': base64.b64encode(b'unreviewed: true').decode()}
+                with patch.object(boot, 'api', side_effect=values.__getitem__), self.assertRaises(ValueError):
+                    boot.controller()
+                # An extra unreviewed workflow cannot be allowed through.
+                values[key] = {'content': base64.b64encode(
+                    boot.reviewed_workflow(workflow).read_bytes()).decode()}
+                values['contents/.github/workflows?ref=main'].append({'name': 'untrusted.yml'})
+                with patch.object(boot, 'api', side_effect=values.__getitem__), self.assertRaises(ValueError):
+                    boot.controller()
 
     def test_truncated_or_malformed_controller_inventory_is_rejected(self):
         for collaborators in ([{'login': 'DruHustle'}] * 100, {'login': 'DruHustle'},
@@ -392,7 +395,7 @@ validate_runner_account onesa-ci
                 self.assertEqual(result.returncode == 0, expected, result.stderr)
 
     def test_all_external_workflow_actions_are_pinned_to_full_commit_shas(self):
-        for name in ('portfolio-gates.yml', boot.WORKFLOW):
+        for name in ('portfolio-gates.yml', 'public-ci.yml', boot.WORKFLOW):
             with self.subTest(workflow=name):
                 for line in boot.reviewed_workflow(name).read_text().splitlines():
                     stripped = line.strip()
