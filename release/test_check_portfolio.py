@@ -4,7 +4,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 from release.check_portfolio import (APPROVED_SOURCE_JOBS, APPROVED_SOURCE_WORKFLOWS,
-                                     SOURCE_REPOSITORIES, has_source_bound_evidence, validate, verify_source_runs)
+                                     SOURCE_REPOSITORIES, has_source_bound_evidence, valid_production_web_url,
+                                     validate, verify_source_runs)
 
 MATRIX = Path(__file__).with_name("portfolio-gates-20261115.json")
 
@@ -60,6 +61,17 @@ class PortfolioGateTests(unittest.TestCase):
             f"https://github.com/DruHustle/onesa-portal/commit/{sha}",
             "https://github.com/DruHustle/onesa-documents/actions/runs/123",
         ]))
+
+    def test_identity_go_uses_account_application_not_auth0_issuer(self):
+        self.assertTrue(valid_production_web_url("identity", "https://account.onesa.eu"))
+        self.assertTrue(valid_production_web_url("identity", "https://account.onesa.eu/readyz"))
+        self.assertFalse(valid_production_web_url("identity", "https://auth.onesa.eu"))
+        self.assertFalse(valid_production_web_url("identity", "https://account.onesa.eu:8443"))
+        self.assertEqual(
+            next(row for row in self.document["entries"]
+                 if row["product"] == "identity" and row["platform"] == "web")["release_url"],
+            "https://account.onesa.eu",
+        )
 
     def test_all_28_client_rows_are_present(self):
         self.assertEqual(len(self.document["entries"]), 28)

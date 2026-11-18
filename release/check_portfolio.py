@@ -45,7 +45,9 @@ PRODUCTION_WEB_HOSTS = {
     "company-portal": frozenset({"portal.onesa.eu"}),
     "documents-public": frozenset({"docs.onesa.eu"}),
     "documents-internal": frozenset({"docs.internal.onesa.eu"}),
-    "identity": frozenset({"auth.onesa.eu"}),
+    # auth.onesa.eu is the DNS-only Auth0 issuer, not the protected Onesa
+    # Account application. Its availability cannot qualify the Identity UI.
+    "identity": frozenset({"account.onesa.eu"}),
 }
 
 
