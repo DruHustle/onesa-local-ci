@@ -40,6 +40,12 @@ APPROVED_SOURCE_JOBS = {product: frozenset() for product in SOURCE_REPOSITORIES}
 # Only reviewed production web hosts may be promoted to GO. Preview hosts and
 # unregistered product domains remain NO-GO until an owner reviews this list.
 PRODUCTION_WEB_HOSTS = {
+    "smart-farmer": frozenset({"farmer.onesa.eu"}),
+    "smart-logistics": frozenset({"logistics.onesa.eu"}),
+    "smart-factory": frozenset({"factory.onesa.eu"}),
+    "onesa-ai-platform": frozenset({"platform.onesa.eu"}),
+    "onesa-drone": frozenset({"drone.onesa.eu"}),
+    "onesa-robot": frozenset({"robot.onesa.eu"}),
     "onesa-mobile": frozenset({"mobile.onesa.eu"}),
     "pasofi": frozenset({"pasofi.mobile.onesa.eu"}),
     "company-portal": frozenset({"portal.onesa.eu"}),
