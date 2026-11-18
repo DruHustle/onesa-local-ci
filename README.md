@@ -33,6 +33,28 @@ Match the source SHA to the reviewed revision before dispatch. Use `gh run watch
 
 An optional `-f run_local=false` dispatch runs the documentation and appearance checks entirely on a private GitHub-hosted runner, subject to the account’s included Actions capacity and spending controls. A hosted-only dispatch records its scope. Product PRs keep their GitHub-hosted jobs.
 
+## Verify the actual local runner (owner Mac only)
+
+A successful GitHub-hosted regression is **not** proof that the Mac runner is online.
+After the controller becomes private and the owner completes the reviewed bootstrap,
+check the Mac's dedicated Lima guest and remote registration with the non-mutating
+doctor. Obtain the ID from a *new* trusted local dispatch shown above.
+
+```sh
+python3 infra/local-runner/doctor.py --run-id RUN_ID
+python3 infra/local-runner/doctor.py --run-id RUN_ID --json
+```
+
+The doctor exits nonzero until it can verify **all** of the following: the
+canonical private controller and admin access, Apple Silicon Mac, expected pinned
+Lima VM and active enabled systemd service, GitHub's online registration and
+matching guest runner ID/labels, plus a successful owner-triggered local workflow
+run on that same runner within the last two hours. It reads run-attempt-scoped
+job evidence to reject stale, skipped, hosted, or wrong-runner receipts. It does
+**not** register or restart the runner, launch a workflow, or expose credentials.
+Do not interpret historical green runs or this public repository's GitHub-hosted
+CI as current local-runner certification.
+
 ## Local runner trust boundary
 
 The local workflow executes the selected public Portal source as the same unprivileged
