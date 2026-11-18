@@ -78,10 +78,10 @@ class PortfolioGateTests(unittest.TestCase):
         self.assertEqual(validate(self.document), [])
 
     def test_incomplete_portfolio_cannot_launch(self):
-        self.assertEqual(len(validate(self.document, require_go=True)), 41)
+        self.assertEqual(len(validate(self.document, require_go=True)), 43)
 
-    def test_all_thirteen_scope_gates_are_present(self):
-        self.assertEqual(len(self.document["scope_gates"]), 13)
+    def test_all_fifteen_scope_gates_are_present(self):
+        self.assertEqual(len(self.document["scope_gates"]), 15)
         self.assertEqual(validate(self.document), [])
 
     def test_scope_go_requires_real_candidate_and_operating_limits(self):
@@ -89,6 +89,20 @@ class PortfolioGateTests(unittest.TestCase):
         gate.update(decision="GO", blocker="",
                     evidence=["https://github.com/DruHustle/pasofi/actions/runs/123"])
         self.assertTrue(any("scoped candidate" in x for x in validate(self.document)))
+
+    def test_each_primary_gateway_is_a_required_separate_wifi_scope(self):
+        for gateway in ("K0", "G0"):
+            with self.subTest(gateway=gateway):
+                document = copy.deepcopy(self.document)
+                document["scope_gates"] = [
+                    row for row in document["scope_gates"]
+                    if not (row["product"] == "pasofi"
+                            and row["kind"] == "wifi-site"
+                            and row["scope"] == gateway)
+                ]
+                errors = validate(document)
+                self.assertTrue(any("missing scope" in error and gateway in error
+                                    for error in errors), errors)
 
     def test_missing_wifi_site_is_rejected(self):
         self.document["scope_gates"] = [

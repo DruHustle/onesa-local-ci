@@ -412,7 +412,7 @@ def validate(document, require_go=False):
     for key in sorted(EXPECTED - seen):
         errors.append(f"missing client {key}")
     required_scopes = (
-        {("pasofi", "wifi-site", site) for site in ("K1", "G1", "G2", "G3")}
+        {("pasofi", "wifi-site", site) for site in ("K0", "K1", "G0", "G1", "G2", "G3")}
         | {("pasofi", "payment-channel", channel) for channel in (
             "Stripe web card", "Apple Pay iPhone", "Google Pay Android"
         )}
