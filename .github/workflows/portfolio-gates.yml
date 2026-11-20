@@ -33,4 +33,4 @@ jobs:
           python-version: "3.11"
       - run: python -m unittest discover -s release -p 'test_*.py' -v
       - run: python -m unittest discover -s infra/local-runner -p 'test_*.py' -v
-      - run: python release/check_portfolio.py release/portfolio-gates-20261115.json
+      - run: python release/check_portfolio.py release/portfolio-gates-current.json
