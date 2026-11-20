@@ -3,6 +3,11 @@ Public repository for credential-free GitHub-hosted CI. The historical trusted l
 
 The `Public hosted CI` workflow runs isolated Python regression tests on GitHub-hosted Ubuntu without repository secrets or self-hosted runners.
 
+## Active portfolio qualification matrix
+
+`release/portfolio-gates-current.json` is the current release-gate input checked by the `Portfolio release matrix` workflow and its regressions. The dated `release/portfolio-gates-20261115.json` remains a historical baseline, not the live qualification decision. Current records may include independently checked source/deployment metadata, but **NO-GO must remain NO-GO** until product-level authorization, real customer workflows, site/payment acceptance, and native installation evidence are actually observed. No runner, release gate, or status is authorized to manufacture GO from a READY deployment or passing synthetic CI.
+
+
 ## Historical local-runner instructions — not authorized on this public repository
 
 **Do not run the bootstrap against this public controller.** It deliberately rejects public visibility. These instructions are retained for reference only and require a separately authorized private controller before use.
