@@ -7,7 +7,7 @@ from release.check_portfolio import (APPROVED_SOURCE_JOBS, APPROVED_SOURCE_WORKF
                                      SOURCE_REPOSITORIES, has_source_bound_evidence, valid_production_web_url,
                                      validate, verify_source_runs)
 
-MATRIX = Path(__file__).with_name("portfolio-gates-20261115.json")
+MATRIX = Path(__file__).with_name("portfolio-gates-current.json")
 
 
 class PortfolioGateTests(unittest.TestCase):
@@ -47,6 +47,22 @@ class PortfolioGateTests(unittest.TestCase):
         repository = repositories[product]
         base = f"https://github.com/DruHustle/{repository}"
         return [f"{base}/commit/{sha}", f"{base}/actions/runs/123"]
+
+    def test_readonly_vercel_deployment_alignment_never_grants_pasofi_commercial_go(self):
+        row = next(x for x in self.document["entries"]
+                   if x["product"] == "pasofi" and x["platform"] == "web")
+        self.assertEqual(row["decision"], "NO-GO")
+        self.assertRegex(row["candidate"], r"^[0-9a-f]{40}$")
+        self.assertIn(
+            f"https://github.com/DruHustle/pasofi/commit/{row['candidate']}",
+            row["evidence"],
+        )
+        self.assertIn("RADIUS", row["blocker"])
+        self.assertEqual(row["role_tested"], "")
+        scopes = [gate for gate in self.document["scope_gates"]
+                  if gate["product"] == "pasofi"]
+        self.assertTrue(scopes)
+        self.assertTrue(all(gate["decision"] == "NO-GO" for gate in scopes))
 
     def test_company_portal_release_evidence_uses_canonical_repository(self):
         sha = "a" * 40
