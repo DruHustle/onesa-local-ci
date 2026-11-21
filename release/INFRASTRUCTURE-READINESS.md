@@ -1,4 +1,4 @@
-# INFRASTRUCTURE-READINESS — observed configuration (20 November 2026)
+# INFRASTRUCTURE-READINESS — observed configuration (21 November 2026)
 
 ## Cloudflare (read-only authenticated checks)
 
@@ -11,9 +11,11 @@
 
 ## Vercel production source alignment (read-only)
 
-The current production deploy `READY` metadata matches GitHub `main` on 11 linked projects: PasoFi, Public Documents, Portal, Smart Farmer, Smart Logistics, Smart Factory, Onesa Mobile, AI Platform, Drone, Robot and Security. Exact SHAs and source names are in [PORTFOLIO-INVENTORY.md](PORTFOLIO-INVENTORY.md). Frontend `READY` alone is **not** a passed E2E test.
+The 11 linked frontend projects each have a `READY` production deployment, but current Vercel metadata shows an exact GitHub `main` match for 10/11. Smart Logistics main is `6b84847a31729040578f55b51d86af05343c53d6`; its latest `READY` production deployment remains at `3ce88dec748691f8a375022d27f68ae171635d81`, and no deployment was found for current main. Exact SHAs and source names are in [PORTFOLIO-INVENTORY.md](PORTFOLIO-INVENTORY.md). Frontend `READY` alone is **not** a passed E2E test.
 
 PasoFi: project `pasofi`, production deployment `dpl_6f7ULqi5JVDMSFkQAtFWmFNcohtZ` reports READY at GitHub main SHA `51f3a0f92680e3fc00a3de51ed2529ca48ffa58f`, with the canonical domain `pasofi.mobile.onesa.eu` attached and verified. Legacy `pamofi.onesa.eu`/`pamofi.vercel.app` aliases still exist; evaluate compatibility and redirect/remove in a reviewed change. Payment and customer internet functionality remain NO-GO.
+
+Smart Logistics: the consolidated release workflow is deliberately manual and requires the running API to serve the exact consolidated SHA, authenticated acceptance, rollback evidence and explicit promotion. None of these gates were bypassed; no deployment was promoted during this check.
 
 Portal: Vercel project still has historic resource name `onesa-company-portal` but is linked to canonical `DruHustle/onesa-portal`. Production `ONESA_IDENTITY_UI_ORIGIN` was privately checked and exactly equals `https://account.onesa.eu`; its update predates the latest READY Portal deployment. It does **not** establish working Auth0 credentials/callbacks or live registration.
 
