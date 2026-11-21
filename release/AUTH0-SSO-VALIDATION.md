@@ -1,4 +1,4 @@
-# AUTH0-SSO-VALIDATION — 20 November 2026
+# AUTH0-SSO-VALIDATION — 21 November 2026
 
 **Production release decision: NO-GO.** All thirty functional test scenarios below are **NOT TESTED** during the current connector-only inspection. No test account was registered, no MFA token entered, and no downstream product access token was issued.
 
@@ -8,7 +8,7 @@
 - Onesa Account UI `account.onesa.eu` has a distinct proxied tunnel DNS entry. The target `onesa-oracle-production-api` Tunnel reported `healthy`, four connections, and a configured `account.onesa.eu` ingress. This is **network-level**, not application readiness.
 - Onesa Portal Vercel **production** `ONESA_IDENTITY_UI_ORIGIN` exists and was privately compared with `https://account.onesa.eu` (exact match). The variable's update predates latest READY Portal deployment; no credential was exposed or changed.
 - The `DruHustle/onesa-identity` production return registry in `src/registration-returns.js` has explicit web/native landing URLs, and `src/store.js` defines product and administrator roles. Source inspection does **not** prove active Auth0 tenant/client registry, email delivery, MFA, recipient session, or authorization.
-- There is no connected Auth0 management integration available to this session, and the connected browser tab control was unavailable. Actual Auth0 tenant status and end-to-end client flows are **NOT TESTED**.
+- No Auth0 management API or Oracle OCI tool is available in this session. The connected Chrome browser was available, but its current tabs did not include an Auth0 tenant or Oracle console. No Auth0 credential, MFA challenge, account, or tenant setting was accessed or changed. Actual Auth0 tenant status and end-to-end client flows are **NOT TESTED**.
 
 ## Mandatory test matrix
 
